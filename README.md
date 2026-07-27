@@ -14,7 +14,11 @@ Required inputs:
 
 ```text
 tracking_data/tracking_data.csv
+tracking_data/tracking_data2.csv
+tracking_data/tracking_data3.csv
 videos/source_traffic.mp4
+videos/flowsense_tracking2.mp4
+videos/flowsense_tracking3.mp4
 ```
 
 Generated outputs:
@@ -69,10 +73,26 @@ From the repository root:
 python track_member1_video.py
 ```
 
-The defaults use the repository paths listed above. Custom paths are supported:
+This processes dataset 1 by default. Select either additional pair with:
+
+```powershell
+python track_member1_video.py --dataset 2
+python track_member1_video.py --dataset 3
+```
+
+Process all three sequentially with:
+
+```powershell
+python track_member1_video.py --dataset all
+```
+
+Each dataset writes to a different video and canonical CSV under `outputs/`, so
+the results do not overwrite each other. Custom paths are supported for a
+single selected dataset:
 
 ```powershell
 python track_member1_video.py `
+    --dataset 1 `
     --csv tracking_data/tracking_data.csv `
     --video videos/source_traffic.mp4 `
     --output outputs/member2_bytetrack_overlay.mp4 `
@@ -120,6 +140,8 @@ center_x,center_y,x1,y1,x2,y2
 Member 3 can read this file directly for unique counts, class distributions,
 density, direction, and trajectory statistics. Member 4 can use the annotated
 video as a dashboard input or import the Python modules for live processing.
+Datasets 2 and 3 use the corresponding names
+`member2_canonical_tracks2.csv` and `member2_canonical_tracks3.csv`.
 
 ## Identity consolidation
 

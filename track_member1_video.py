@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+from dataclasses import dataclass
 from pathlib import Path
 
 from flowsense.csv_detections import load_detection_csv
@@ -11,10 +12,38 @@ from flowsense.tracking import ByteTrackTracker, IdentityConsolidator
 from flowsense.tracking.render import render_tracking_ids
 
 
-DEFAULT_CSV = Path("tracking_data/tracking_data.csv")
-DEFAULT_VIDEO = Path("videos/source_traffic.mp4")
-DEFAULT_OUTPUT = Path("outputs/member2_bytetrack_overlay.mp4")
-DEFAULT_TRACKS_OUTPUT = Path("outputs/member2_canonical_tracks.csv")
+
+@dataclass(frozen=True, slots=True)
+class DatasetConfig:
+    """Paths associated with one of Member 1's detection/video pairs."""
+
+    csv_path: Path
+    video_path: Path
+    output_path: Path
+    tracks_output_path: Path
+
+
+DATASETS = {
+    "1": DatasetConfig(
+        csv_path=Path("tracking_data/tracking_data.csv"),
+        video_path=Path("videos/source_traffic.mp4"),
+        output_path=Path("outputs/member2_bytetrack_overlay.mp4"),
+        tracks_output_path=Path("outputs/member2_canonical_tracks.csv"),
+    ),
+    "2": DatasetConfig(
+        csv_path=Path("tracking_data/tracking_data2.csv"),
+        video_path=Path("videos/flowsense_tracking2.mp4"),
+        output_path=Path("outputs/member2_bytetrack_overlay2.mp4"),
+        tracks_output_path=Path("outputs/member2_canonical_tracks2.csv"),
+    ),
+    "3": DatasetConfig(
+        csv_path=Path("tracking_data/tracking_data3.csv"),
+        video_path=Path("videos/flowsense_tracking3.mp4"),
+        output_path=Path("outputs/member2_bytetrack_overlay3.mp4"),
+        tracks_output_path=Path("outputs/member2_canonical_tracks3.csv"),
+    ),
+}
+DEFAULT_TRACKS_OUTPUT = DATASETS["1"].tracks_output_path
 TRACK_CSV_COLUMNS = (
     "frame",
     "time_seconds",
@@ -181,17 +210,23 @@ def track_csv_on_video(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Use Member 1's CSV detections as ByteTrack input and overlay the "
-            "new tracking IDs on the original training video."
+            "Use one or all of Member 1's CSV/video pairs as ByteTrack input "
+            "and overlay canonical tracking IDs on the associated video."
         )
     )
-    parser.add_argument("--csv", type=Path, default=DEFAULT_CSV)
-    parser.add_argument("--video", type=Path, default=DEFAULT_VIDEO)
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument(
+        "--dataset",
+        choices=(*DATASETS, "all"),
+        default="1",
+        help="Built-in dataset pair to process (default: 1).",
+    )
+    parser.add_argument("--csv", type=Path, default=None)
+    parser.add_argument("--video", type=Path, default=None)
+    parser.add_argument("--output", type=Path, default=None)
     parser.add_argument(
         "--tracks-output",
         type=Path,
-        default=DEFAULT_TRACKS_OUTPUT,
+        default=None,
         help="CSV output containing the canonical IDs visible in each frame.",
     )
     parser.add_argument(
@@ -203,15 +238,35 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     if args.max_frames is not None and args.max_frames <= 0:
         parser.error("--max-frames must be greater than zero")
+    if args.dataset == "all" and any(
+        value is not None
+        for value in (args.csv, args.video, args.output, args.tracks_output)
+    ):
+        parser.error(
+            "--csv, --video, --output, and --tracks-output cannot be combined "
+            "with --dataset all"
+        )
     return args
 
 
+def run_from_args(arguments: argparse.Namespace) -> list[dict[str, int | float | str]]:
+    """Run the selected built-in dataset(s), applying individual overrides."""
+    dataset_ids = DATASETS if arguments.dataset == "all" else (arguments.dataset,)
+    summaries = []
+    for dataset_id in dataset_ids:
+        config = DATASETS[dataset_id]
+        print(f"\nProcessing dataset {dataset_id}")
+        summaries.append(
+            track_csv_on_video(
+                arguments.csv or config.csv_path,
+                arguments.video or config.video_path,
+                arguments.output or config.output_path,
+                arguments.tracks_output or config.tracks_output_path,
+                maximum_frames=arguments.max_frames,
+            )
+        )
+    return summaries
+
+
 if __name__ == "__main__":
-    arguments = parse_args()
-    track_csv_on_video(
-        arguments.csv,
-        arguments.video,
-        arguments.output,
-        arguments.tracks_output,
-        maximum_frames=arguments.max_frames,
-    )
+    run_from_args(parse_args())
