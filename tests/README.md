@@ -5,6 +5,9 @@ during development. These files should remain in GitHub while the team is
 developing and merging, but they are not required in the final deployed
 application or presentation bundle.
 
+The suite also verifies that datasets 1, 2, and 3 remain paired with the correct
+CSV and video filenames.
+
 Run all tests from the repository root:
 
 ```powershell
