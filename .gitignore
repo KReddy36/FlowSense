@@ -1,0 +1,10 @@
+.deps/
+.venv/
+.venv-old/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+outputs/
+.vscode/
+fromMember1/
