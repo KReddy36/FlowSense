@@ -42,6 +42,12 @@ DATASETS = {
         output_path=Path("outputs/member2_bytetrack_overlay3.mp4"),
         tracks_output_path=Path("outputs/member2_canonical_tracks3.csv"),
     ),
+    "4": DatasetConfig(
+        csv_path=Path("tracking_data/tracking_data4.csv"),
+        video_path=Path("videos/flowsense_tracking4.mp4"),
+        output_path=Path("outputs/member2_bytetrack_overlay4.mp4"),
+        tracks_output_path=Path("outputs/member2_canonical_tracks4.csv"),
+    ),
 }
 DEFAULT_TRACKS_OUTPUT = DATASETS["1"].tracks_output_path
 TRACK_CSV_COLUMNS = (
@@ -60,6 +66,18 @@ TRACK_CSV_COLUMNS = (
 )
 
 
+def resolve_built_in_video_path(video_path: Path) -> Path:
+    """Resolve upload-added filename suffixes for a built-in video.
+
+    GitHub/browser uploads can append strings such as `` (1)`` to a filename.
+    Prefer the canonical configured path, then accept exactly one matching MP4.
+    """
+    if video_path.is_file():
+        return video_path
+    matches = sorted(video_path.parent.glob(f"{video_path.stem}*.mp4"))
+    return matches[0] if len(matches) == 1 else video_path
+
+
 def track_csv_on_video(
     csv_path: str | Path,
     video_path: str | Path,
@@ -67,6 +85,7 @@ def track_csv_on_video(
     tracks_output_path: str | Path = DEFAULT_TRACKS_OUTPUT,
     *,
     maximum_frames: int | None = None,
+    generate_video: bool = True,
 ) -> dict[str, int | float | str]:
     """Render canonical IDs and export the same visible tracks as CSV."""
     try:
@@ -104,17 +123,21 @@ def track_csv_on_video(
             f"{video_frame_count} frames"
         )
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
     tracks_output_path.parent.mkdir(parents=True, exist_ok=True)
-    writer = cv2.VideoWriter(
-        str(output_path),
-        cv2.VideoWriter_fourcc(*"mp4v"),
-        fps,
-        (width, height),
-    )
-    if not writer.isOpened():
+    writer = None
+    if generate_video:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        writer = cv2.VideoWriter(
+            str(output_path),
+            cv2.VideoWriter_fourcc(*"mp4v"),
+            fps,
+            (width, height),
+        )
+    if generate_video and (writer is None or not writer.isOpened()):
         capture.release()
         raise RuntimeError(f"Could not create output video: {output_path}")
+    if not generate_video:
+        capture.release()
 
     tracker = ByteTrackTracker(frame_rate=max(1, round(fps)))
     consolidator = IdentityConsolidator()
@@ -128,8 +151,12 @@ def track_csv_on_video(
 
     try:
         while maximum_frames is None or processed_frames < maximum_frames:
-            success, frame = capture.read()
-            if not success:
+            frame = None
+            if generate_video:
+                success, frame = capture.read()
+                if not success:
+                    break
+            elif processed_frames >= video_frame_count:
                 break
 
             raw_tracks = tracker.update(detections_by_frame.get(processed_frames, ()))
@@ -159,27 +186,31 @@ def track_csv_on_video(
                         "y2": track.y2,
                     }
                 )
-            annotated = render_tracking_ids(frame, visible_tracks)
-            cv2.putText(
-                annotated,
-                (
-                    f"ByteTrack | frame {processed_frames}/{video_frame_count - 1} "
-                    f"| active tracks {len(visible_tracks)}"
-                ),
-                (20, 40),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.85,
-                (255, 255, 255),
-                2,
-                cv2.LINE_AA,
-            )
-            writer.write(annotated)
+            if generate_video and frame is not None and writer is not None:
+                annotated = render_tracking_ids(frame, visible_tracks)
+                cv2.putText(
+                    annotated,
+                    (
+                        f"ByteTrack | frame {processed_frames}/"
+                        f"{video_frame_count - 1} "
+                        f"| active tracks {len(visible_tracks)}"
+                    ),
+                    (20, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.85,
+                    (255, 255, 255),
+                    2,
+                    cv2.LINE_AA,
+                )
+                writer.write(annotated)
             processed_frames += 1
             if processed_frames % 100 == 0:
                 print(f"Processed {processed_frames}/{video_frame_count} frames")
     finally:
-        capture.release()
-        writer.release()
+        if generate_video:
+            capture.release()
+        if writer is not None:
+            writer.release()
         tracks_file.close()
 
     required_frames = min(
@@ -198,7 +229,9 @@ def track_csv_on_video(
         "rendered_track_instances": rendered_tracks,
         "suppressed_duplicate_instances": suppressed_track_instances,
         "unique_track_ids": len(unique_track_ids),
-        "output_video": str(output_path.resolve()),
+        "output_video": (
+            str(output_path.resolve()) if generate_video else "disabled"
+        ),
         "output_tracks": str(tracks_output_path.resolve()),
     }
     print("Tracking complete")
@@ -235,6 +268,14 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional short-run limit for debugging.",
     )
+    parser.add_argument(
+        "--no-video",
+        action="store_true",
+        help=(
+            "Generate only the canonical tracking CSV; skip video decoding, "
+            "annotation, and encoding."
+        ),
+    )
     args = parser.parse_args()
     if args.max_frames is not None and args.max_frames <= 0:
         parser.error("--max-frames must be greater than zero")
@@ -246,6 +287,8 @@ def parse_args() -> argparse.Namespace:
             "--csv, --video, --output, and --tracks-output cannot be combined "
             "with --dataset all"
         )
+    if args.no_video and args.output is not None:
+        parser.error("--output cannot be used with --no-video")
     return args
 
 
@@ -255,14 +298,16 @@ def run_from_args(arguments: argparse.Namespace) -> list[dict[str, int | float |
     summaries = []
     for dataset_id in dataset_ids:
         config = DATASETS[dataset_id]
+        configured_video = resolve_built_in_video_path(config.video_path)
         print(f"\nProcessing dataset {dataset_id}")
         summaries.append(
             track_csv_on_video(
                 arguments.csv or config.csv_path,
-                arguments.video or config.video_path,
+                arguments.video or configured_video,
                 arguments.output or config.output_path,
                 arguments.tracks_output or config.tracks_output_path,
                 maximum_frames=arguments.max_frames,
+                generate_video=not arguments.no_video,
             )
         )
     return summaries
