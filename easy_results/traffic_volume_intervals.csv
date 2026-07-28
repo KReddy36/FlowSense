@@ -18,29 +18,53 @@ Video 1,25,30,Away from camera,Pedestrian,0
 Video 1,25,30,Cross-traffic,Pedestrian,0
 Video 1,25,30,Toward camera,Car,0
 Video 2,0,5,Away from camera,Car,0
-Video 2,0,5,Toward camera,Car,4
+Video 2,0,5,Toward camera,Car,2
+Video 2,0,5,Toward camera,Motorcycle,1
+Video 2,0,5,Toward camera,Truck,1
 Video 2,5,10,Away from camera,Car,1
 Video 2,5,10,Toward camera,Car,7
+Video 2,5,10,Toward camera,Motorcycle,0
+Video 2,5,10,Toward camera,Truck,0
 Video 2,10,15,Away from camera,Car,1
 Video 2,10,15,Toward camera,Car,6
+Video 2,10,15,Toward camera,Motorcycle,0
+Video 2,10,15,Toward camera,Truck,0
 Video 2,15,20,Away from camera,Car,0
-Video 2,15,20,Toward camera,Car,7
+Video 2,15,20,Toward camera,Car,6
+Video 2,15,20,Toward camera,Motorcycle,0
+Video 2,15,20,Toward camera,Truck,1
 Video 2,20,25,Away from camera,Car,0
 Video 2,20,25,Toward camera,Car,5
+Video 2,20,25,Toward camera,Motorcycle,0
+Video 2,20,25,Toward camera,Truck,0
 Video 2,25,30,Away from camera,Car,0
 Video 2,25,30,Toward camera,Car,7
+Video 2,25,30,Toward camera,Motorcycle,0
+Video 2,25,30,Toward camera,Truck,0
 Video 2,30,35,Away from camera,Car,0
 Video 2,30,35,Toward camera,Car,7
+Video 2,30,35,Toward camera,Motorcycle,0
+Video 2,30,35,Toward camera,Truck,0
 Video 2,35,40,Away from camera,Car,0
 Video 2,35,40,Toward camera,Car,7
+Video 2,35,40,Toward camera,Motorcycle,0
+Video 2,35,40,Toward camera,Truck,0
 Video 2,40,45,Away from camera,Car,1
 Video 2,40,45,Toward camera,Car,6
+Video 2,40,45,Toward camera,Motorcycle,0
+Video 2,40,45,Toward camera,Truck,0
 Video 2,45,50,Away from camera,Car,0
 Video 2,45,50,Toward camera,Car,4
+Video 2,45,50,Toward camera,Motorcycle,0
+Video 2,45,50,Toward camera,Truck,0
 Video 2,50,55,Away from camera,Car,2
 Video 2,50,55,Toward camera,Car,5
+Video 2,50,55,Toward camera,Motorcycle,0
+Video 2,50,55,Toward camera,Truck,0
 Video 2,55,60,Away from camera,Car,0
-Video 2,55,60,Toward camera,Car,2
+Video 2,55,60,Toward camera,Car,1
+Video 2,55,60,Toward camera,Motorcycle,1
+Video 2,55,60,Toward camera,Truck,0
 Video 3,0,5,Away from camera,Bus,0
 Video 3,0,5,Away from camera,Car,5
 Video 3,0,5,Away from camera,Pedestrian,1

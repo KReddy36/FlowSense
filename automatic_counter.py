@@ -23,7 +23,7 @@ import math
 import re
 import statistics
 from collections import Counter, defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Iterable
 
@@ -36,7 +36,7 @@ BASE_REQUIRED_COLUMNS = {
     "center_y",
 }
 ID_COLUMNS = ("canonical_id", "track_id")
-PROGRAM_VERSION = "hybrid-v5"
+PROGRAM_VERSION = "hybrid-v6.2"
 CLASS_NAMES = {
     "person": "Pedestrian",
     "pedestrian": "Pedestrian",
@@ -192,6 +192,20 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--class-evidence-window-seconds",
+        type=float,
+        default=6.0,
+        help=(
+            "Maximum time between a passage crossing and a downstream "
+            "non-car class fragment used to refine its class (default: 6)"
+        ),
+    )
+    parser.add_argument(
+        "--disable-passage-class-refinement",
+        action="store_true",
+        help="Do not use downstream class fragments to refine passage counts",
+    )
+    parser.add_argument(
         "--config",
         type=Path,
         help=(
@@ -202,11 +216,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--manual-counts",
         type=Path,
-        help="Optional Kelvin count CSV used to create comparison_with_kelvin.csv",
+        help=(
+            "Optional Kelvin count CSV. If omitted, an unambiguous "
+            "kelvin_vehicle_counts*.csv beside the inputs is used automatically"
+        ),
     )
     parser.add_argument(
         "--evaluation-video",
-        help="Video label to reserve as evaluation data, usually Video 4",
+        default="Video 4",
+        help="Video label reserved as evaluation data (default: Video 4)",
     )
     parser.add_argument(
         "--output-dir",
@@ -270,6 +288,34 @@ def discover_csvs(inputs: list[str]) -> list[Path]:
             "beside the program or pass the file paths."
         )
     return paths
+
+
+def discover_kelvin_file(csv_paths: list[Path]) -> Path | None:
+    roots: list[Path] = []
+    for root in [*(path.parent for path in csv_paths), Path.cwd()]:
+        resolved = root.resolve()
+        if resolved not in roots:
+            roots.append(resolved)
+    for root in roots:
+        candidates: dict[str, Path] = {}
+        for path in root.glob("kelvin_vehicle_counts*.csv"):
+            if path.is_file():
+                candidates[str(path.resolve())] = path
+        matches = sorted(
+            candidates.values(), key=lambda path: str(path).lower()
+        )
+        if len(matches) == 1:
+            return matches[0]
+        exact = [
+            path
+            for path in matches
+            if path.name.lower() == "kelvin_vehicle_counts.csv"
+        ]
+        if len(exact) == 1:
+            return exact[0]
+        if matches:
+            return None
+    return None
 
 
 def required_text(row: dict[str, str], key: str, row_number: int) -> str:
@@ -345,6 +391,23 @@ def load_detections(path: Path) -> tuple[list[Detection], str]:
 def normalize_class_name(name: str) -> str:
     cleaned = " ".join(name.strip().lower().replace("_", " ").split())
     return CLASS_NAMES.get(cleaned, cleaned.title())
+
+
+def class_count_phrase(class_name: str, count: int) -> str:
+    singular = class_name.lower()
+    if count == 1:
+        return f"{count} {singular}"
+    plurals = {
+        "bus": "buses",
+        "person": "people",
+        "pedestrian": "pedestrians",
+        "motorcycle": "motorcycles",
+        "bicycle": "bicycles",
+        "truck": "trucks",
+        "car": "cars",
+        "van": "vans",
+    }
+    return f"{count} {plurals.get(singular, singular + 's')}"
 
 
 def inferred_video_number(path: Path) -> int | None:
@@ -661,6 +724,85 @@ def analyze_tracks(
     return sorted(results, key=lambda item: id_sort_key(item.canonical_id))
 
 
+def refine_passage_classes(
+    results: list[TrackResult],
+    max_time_gap_seconds: float,
+) -> list[TrackResult]:
+    """Use nearby non-car fragments as class evidence without adding counts.
+
+    Passage counting is intentionally based on crossing events, so fragmented
+    tracks that begin below the line are excluded from the total.  Those
+    fragments can still contain useful YOLO class evidence.  Each excluded
+    non-car vehicle fragment may reclassify one nearby counted Car, preserving
+    the passage total and the count-once guarantee.
+    """
+    if not results or results[0].counting_method != "passage":
+        return results
+
+    refined = list(results)
+    counted_by_class = Counter(
+        item.class_name for item in refined if item.counted
+    )
+    evidence_by_class: dict[str, list[TrackResult]] = defaultdict(list)
+    for item in refined:
+        if (
+            not item.counted
+            and item.class_name in VEHICLE_CLASSES
+            and item.class_name != "Car"
+            and item.row_count >= 2
+        ):
+            evidence_by_class[item.class_name].append(item)
+
+    unused_car_indices = {
+        index
+        for index, item in enumerate(refined)
+        if item.counted and item.class_name == "Car"
+    }
+    for class_name in sorted(evidence_by_class):
+        needed = max(
+            0,
+            len(evidence_by_class[class_name]) - counted_by_class[class_name],
+        )
+        evidence_items = sorted(
+            evidence_by_class[class_name],
+            key=lambda item: (item.first_time_seconds, id_sort_key(item.canonical_id)),
+        )
+        for evidence in evidence_items[:needed]:
+            candidates = [
+                index
+                for index in unused_car_indices
+                if abs(
+                    refined[index].count_time_seconds
+                    - evidence.first_time_seconds
+                )
+                <= max_time_gap_seconds
+            ]
+            if not candidates:
+                continue
+            best_index = min(
+                candidates,
+                key=lambda index: (
+                    abs(
+                        refined[index].count_time_seconds
+                        - evidence.first_time_seconds
+                    ),
+                    refined[index].count_time_seconds,
+                ),
+            )
+            counted = refined[best_index]
+            refined[best_index] = replace(
+                counted,
+                class_name=class_name,
+                status=(
+                    f"{counted.status}; class refined from downstream "
+                    f"{class_name} fragment {evidence.canonical_id}"
+                ),
+            )
+            unused_car_indices.remove(best_index)
+            counted_by_class[class_name] += 1
+    return refined
+
+
 def id_sort_key(identifier: str) -> tuple[int, float | str]:
     try:
         return 0, float(identifier)
@@ -808,6 +950,8 @@ def write_html_report(
     results: list[TrackResult],
     video_settings: dict[str, dict[str, object]],
     summary_rows: list[dict[str, object]],
+    comparison_rows: list[dict[str, object]] | None = None,
+    class_comparison_rows: list[dict[str, object]] | None = None,
 ) -> None:
     moving_all = [item for item in results if item.counted]
     total_moving = len(moving_all)
@@ -817,6 +961,58 @@ def write_html_report(
         summary_headers,
         [[row[header] for header in summary_headers] for row in summary_rows],
     )
+    comparison_section = ""
+    if comparison_rows:
+        display_headers = [
+            "Video",
+            "Dataset role",
+            "Kelvin vehicles",
+            "Automatic vehicles",
+            "Difference",
+            "Vehicle class absolute error",
+        ]
+        comparison_table = _html_table(
+            display_headers,
+            [
+                [row[header] for header in display_headers]
+                for row in comparison_rows
+            ],
+        )
+        comparison_section = f"""
+        <div class="overview">
+          <p class="eyebrow">MANUAL COMPARISON</p>
+          <h2>FlowSense compared with Kelvin</h2>
+          <p>Vehicle totals and class error are compared by video. Direction
+          is excluded because the two direction-label systems differ.</p>
+          {comparison_table}
+        </div>
+        """
+    class_comparison_section = ""
+    if class_comparison_rows:
+        display_headers = [
+            "Video",
+            "Class",
+            "Kelvin count",
+            "Automatic count",
+            "Error (automatic - Kelvin)",
+        ]
+        class_comparison_table = _html_table(
+            display_headers,
+            [
+                [row[header] for header in display_headers]
+                for row in class_comparison_rows
+                if row["Class"] in VEHICLE_CLASSES
+            ],
+        )
+        class_comparison_section = f"""
+        <div class="overview">
+          <p class="eyebrow">CLASS COMPARISON</p>
+          <h2>Kelvin versus FlowSense by vehicle class</h2>
+          <p>This table makes the car, truck, motorcycle, bicycle, and bus
+          results visible separately instead of hiding them inside the total.</p>
+          {class_comparison_table}
+        </div>
+        """
 
     sections: list[str] = []
     for video in videos:
@@ -841,7 +1037,7 @@ def write_html_report(
             "Mixed/unclear": "in a mixed or unclear direction",
         }
         sentences = [
-            f"{count} {class_name.lower()}{'' if count == 1 else 's'} "
+            f"{class_count_phrase(class_name, count)} "
             f"moving {direction_phrases[direction]}"
             for (direction, class_name), count in sorted(
                 Counter(
@@ -973,6 +1169,8 @@ def write_html_report(
       <h3>One-row summary</h3>
       {summary_table}
     </div>
+    {comparison_section}
+    {class_comparison_section}
     {''.join(sections)}
     <footer>
       Open object_movement_audit.csv only when you need to check an individual ID.
@@ -1029,6 +1227,20 @@ def interval_rows(
 
 def normalized_header(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", name.strip().lower())
+
+
+def parse_count_cell(value: str) -> int | None:
+    """Read a nonnegative integer, allowing notes such as '3 (reviewed)'."""
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    match = re.match(r"^(\d+(?:\.0+)?)\b", cleaned)
+    if match is None:
+        raise ValueError(f"Could not read count value {value!r}")
+    count = int(float(match.group(1)))
+    if count < 0:
+        raise ValueError("Kelvin counts cannot be negative")
+    return count
 
 
 def normalize_direction(name: str) -> str:
@@ -1166,9 +1378,18 @@ def load_kelvin_class_totals(
         reader = csv.DictReader(handle)
         fieldnames = reader.fieldnames or []
         header_map = {normalized_header(name): name for name in fieldnames}
-        if "video" not in header_map:
-            raise ValueError(f"{path.name} needs a Video column")
-        video_header = header_map["video"]
+        video_header = next(
+            (
+                header_map[key]
+                for key in ("video", "videonumber", "videoid")
+                if key in header_map
+            ),
+            None,
+        )
+        if video_header is None:
+            raise ValueError(
+                f"{path.name} needs a Video or Video number column"
+            )
         rows = list(reader)
 
     def resolved_video(raw: str) -> str:
@@ -1199,12 +1420,9 @@ def load_kelvin_class_totals(
     totals: Counter[tuple[str, str]] = Counter()
     if class_header is not None and count_header is not None:
         for row in rows:
-            raw_count = (row.get(count_header) or "").strip()
-            if not raw_count:
+            count = parse_count_cell(row.get(count_header) or "")
+            if count is None:
                 continue
-            count = int(float(raw_count))
-            if count < 0:
-                raise ValueError("Kelvin counts cannot be negative")
             totals[
                 (
                     resolved_video(row[video_header]),
@@ -1231,11 +1449,15 @@ def load_kelvin_class_totals(
         "van": "Van",
         "vans": "Van",
     }
-    class_columns = {
-        original: wide_classes[normalized]
-        for normalized, original in header_map.items()
-        if normalized in wide_classes
-    }
+    class_columns: dict[str, str] = {}
+    for normalized, original in header_map.items():
+        base = normalized
+        for suffix in ("crossings", "crossing", "counts", "count"):
+            if base.endswith(suffix):
+                base = base[: -len(suffix)]
+                break
+        if base in wide_classes:
+            class_columns[original] = wide_classes[base]
     if not class_columns:
         raise ValueError(
             f"{path.name} needs either Class/Kelvin count columns or "
@@ -1244,12 +1466,9 @@ def load_kelvin_class_totals(
     for row in rows:
         video = resolved_video(row[video_header])
         for column, class_name in class_columns.items():
-            raw_count = (row.get(column) or "").strip()
-            if not raw_count:
+            count = parse_count_cell(row.get(column) or "")
+            if count is None:
                 continue
-            count = int(float(raw_count))
-            if count < 0:
-                raise ValueError("Kelvin counts cannot be negative")
             totals[(video, class_name)] += count
     return dict(totals)
 
@@ -1303,6 +1522,82 @@ def class_comparison_rows(
     return rows
 
 
+def video_comparison_rows(
+    videos: list[str],
+    results: list[TrackResult],
+    kelvin_totals: dict[tuple[str, str], int],
+    evaluation_video: str | None,
+) -> list[dict[str, object]]:
+    automatic = Counter(
+        (item.video, item.class_name)
+        for item in results
+        if item.counted
+    )
+    rows: list[dict[str, object]] = []
+    for video in videos:
+        kelvin_available = any(key[0] == video for key in kelvin_totals)
+        automatic_vehicles = sum(
+            automatic[(video, class_name)]
+            for class_name in VEHICLE_CLASSES
+        )
+        kelvin_vehicles = (
+            sum(
+                kelvin_totals.get((video, class_name), 0)
+                for class_name in VEHICLE_CLASSES
+            )
+            if kelvin_available
+            else None
+        )
+        vehicle_error = (
+            automatic_vehicles - kelvin_vehicles
+            if kelvin_vehicles is not None
+            else None
+        )
+        class_absolute_error = (
+            sum(
+                abs(
+                    automatic[(video, class_name)]
+                    - kelvin_totals.get((video, class_name), 0)
+                )
+                for class_name in VEHICLE_CLASSES
+            )
+            if kelvin_available
+            else None
+        )
+        rows.append(
+            {
+                "Video": video,
+                "Dataset role": (
+                    "Evaluation"
+                    if evaluation_video and video == evaluation_video
+                    else "Development"
+                ),
+                "Kelvin vehicles": (
+                    kelvin_vehicles if kelvin_vehicles is not None else ""
+                ),
+                "Automatic vehicles": automatic_vehicles,
+                "Difference": (
+                    vehicle_error if vehicle_error is not None else ""
+                ),
+                "Absolute vehicle error": (
+                    abs(vehicle_error) if vehicle_error is not None else ""
+                ),
+                "Vehicle class absolute error": (
+                    class_absolute_error
+                    if class_absolute_error is not None
+                    else ""
+                ),
+                "Kelvin pedestrians": (
+                    kelvin_totals.get((video, "Pedestrian"), 0)
+                    if kelvin_available
+                    else ""
+                ),
+                "Automatic pedestrians": automatic[(video, "Pedestrian")],
+            }
+        )
+    return rows
+
+
 def run(args: argparse.Namespace) -> dict[str, object]:
     if args.movement_threshold_pixels <= 0:
         raise ValueError("--movement-threshold-pixels must be positive")
@@ -1316,6 +1611,8 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         raise ValueError("--passage-hysteresis-pixels cannot be negative")
     if args.fragmentation_ids_per_minute <= 0:
         raise ValueError("--fragmentation-ids-per-minute must be positive")
+    if args.class_evidence_window_seconds < 0:
+        raise ValueError("--class-evidence-window-seconds cannot be negative")
 
     csv_paths = discover_csvs(args.inputs)
     explicit_numbers = {
@@ -1394,6 +1691,14 @@ def run(args: argparse.Namespace) -> dict[str, object]:
             passage_line_y=passage_line_y,
             passage_hysteresis_pixels=args.passage_hysteresis_pixels,
         )
+        if (
+            selected_counting_method == "passage"
+            and not args.disable_passage_class_refinement
+        ):
+            results = refine_passage_classes(
+                results,
+                args.class_evidence_window_seconds,
+            )
         videos.append(video)
         all_results.extend(results)
         durations[video] = max(row.time_seconds for row in detections)
@@ -1413,6 +1718,16 @@ def run(args: argparse.Namespace) -> dict[str, object]:
             "passage_line_y": (
                 round(passage_line_y, 3)
                 if passage_line_y is not None
+                else None
+            ),
+            "passage_class_refinement": (
+                selected_counting_method == "passage"
+                and not args.disable_passage_class_refinement
+            ),
+            "class_evidence_window_seconds": (
+                args.class_evidence_window_seconds
+                if selected_counting_method == "passage"
+                and not args.disable_passage_class_refinement
                 else None
             ),
         }
@@ -1435,13 +1750,6 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         args.output_dir / "READ_ME_FIRST.csv",
         easy_summary,
         easy_fields,
-    )
-    write_html_report(
-        args.output_dir / "FlowSense_report.html",
-        videos,
-        all_results,
-        video_settings,
-        easy_summary,
     )
     file_map_rows = [
         {
@@ -1484,9 +1792,14 @@ def run(args: argparse.Namespace) -> dict[str, object]:
     )
 
     aliases = video_alias_map(videos, video_settings)
+    manual_counts_path = (
+        args.manual_counts
+        if args.manual_counts is not None
+        else discover_kelvin_file(csv_paths)
+    )
     kelvin_class_totals = (
-        load_kelvin_class_totals(args.manual_counts, aliases)
-        if args.manual_counts
+        load_kelvin_class_totals(manual_counts_path, aliases)
+        if manual_counts_path
         else {}
     )
     comparison = class_comparison_rows(
@@ -1509,6 +1822,37 @@ def run(args: argparse.Namespace) -> dict[str, object]:
             "Absolute error",
             "Percent error",
         ],
+    )
+    comparison_by_video = video_comparison_rows(
+        videos,
+        all_results,
+        kelvin_class_totals,
+        args.evaluation_video,
+    )
+    comparison_video_name = "comparison_by_video.csv"
+    write_csv(
+        args.output_dir / comparison_video_name,
+        comparison_by_video,
+        [
+            "Video",
+            "Dataset role",
+            "Kelvin vehicles",
+            "Automatic vehicles",
+            "Difference",
+            "Absolute vehicle error",
+            "Vehicle class absolute error",
+            "Kelvin pedestrians",
+            "Automatic pedestrians",
+        ],
+    )
+    write_html_report(
+        args.output_dir / "FlowSense_report.html",
+        videos,
+        all_results,
+        video_settings,
+        easy_summary,
+        comparison_by_video if kelvin_class_totals else None,
+        comparison if kelvin_class_totals else None,
     )
 
     per_video: dict[str, dict[str, object]] = {}
@@ -1541,6 +1885,12 @@ def run(args: argparse.Namespace) -> dict[str, object]:
             "default_passage_line_fraction": args.passage_line_fraction,
             "passage_hysteresis_pixels": args.passage_hysteresis_pixels,
             "fragmentation_ids_per_minute": args.fragmentation_ids_per_minute,
+            "passage_class_refinement": (
+                not args.disable_passage_class_refinement
+            ),
+            "class_evidence_window_seconds": (
+                args.class_evidence_window_seconds
+            ),
             "default_toward_camera_image_direction": args.toward_camera,
             "cross_traffic_ratio": args.cross_traffic_ratio,
             "interval_seconds": args.interval_seconds,
@@ -1571,7 +1921,13 @@ def run(args: argparse.Namespace) -> dict[str, object]:
             ),
         },
         "kelvin_comparison_file": comparison_name,
+        "kelvin_video_comparison_file": comparison_video_name,
         "kelvin_counts_supplied": bool(kelvin_class_totals),
+        "kelvin_counts_source": (
+            str(manual_counts_path.resolve())
+            if manual_counts_path is not None
+            else None
+        ),
     }
     with (args.output_dir / "summary.json").open(
         "w", encoding="utf-8"
