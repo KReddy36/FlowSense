@@ -13,3 +13,7 @@ Run all tests from the repository root:
 ```powershell
 python -m unittest discover -s tests -v
 ```
+
+`test_motion_prediction.py` verifies bounded rolling histories, velocity
+smoothing, prediction through missed detections, and inactive-track deletion.
+Like the rest of this directory, it is test-only.

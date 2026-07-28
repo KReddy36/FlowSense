@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from flowsense.csv_detections import load_detection_csv
-from flowsense.tracking import ByteTrackTracker, IdentityConsolidator
-from flowsense.tracking.render import render_tracking_ids
+from flowsense.tracking import ByteTrackTracker, IdentityConsolidator, MotionPredictor
+from flowsense.tracking.render import render_motion_paths, render_tracking_ids
 
 
 
@@ -21,6 +21,7 @@ class DatasetConfig:
     video_path: Path
     output_path: Path
     tracks_output_path: Path
+    motion_output_path: Path
 
 
 DATASETS = {
@@ -29,27 +30,32 @@ DATASETS = {
         video_path=Path("videos/source_traffic.mp4"),
         output_path=Path("outputs/member2_bytetrack_overlay.mp4"),
         tracks_output_path=Path("outputs/member2_canonical_tracks.csv"),
+        motion_output_path=Path("outputs/member2_motion_predictions.csv"),
     ),
     "2": DatasetConfig(
         csv_path=Path("tracking_data/tracking_data2.csv"),
         video_path=Path("videos/flowsense_tracking2.mp4"),
         output_path=Path("outputs/member2_bytetrack_overlay2.mp4"),
         tracks_output_path=Path("outputs/member2_canonical_tracks2.csv"),
+        motion_output_path=Path("outputs/member2_motion_predictions2.csv"),
     ),
     "3": DatasetConfig(
         csv_path=Path("tracking_data/tracking_data3.csv"),
         video_path=Path("videos/flowsense_tracking3.mp4"),
         output_path=Path("outputs/member2_bytetrack_overlay3.mp4"),
         tracks_output_path=Path("outputs/member2_canonical_tracks3.csv"),
+        motion_output_path=Path("outputs/member2_motion_predictions3.csv"),
     ),
     "4": DatasetConfig(
         csv_path=Path("tracking_data/tracking_data4.csv"),
         video_path=Path("videos/flowsense_tracking4.mp4"),
         output_path=Path("outputs/member2_bytetrack_overlay4.mp4"),
         tracks_output_path=Path("outputs/member2_canonical_tracks4.csv"),
+        motion_output_path=Path("outputs/member2_motion_predictions4.csv"),
     ),
 }
 DEFAULT_TRACKS_OUTPUT = DATASETS["1"].tracks_output_path
+DEFAULT_MOTION_OUTPUT = DATASETS["1"].motion_output_path
 TRACK_CSV_COLUMNS = (
     "frame",
     "time_seconds",
@@ -63,6 +69,26 @@ TRACK_CSV_COLUMNS = (
     "y1",
     "x2",
     "y2",
+)
+MOTION_CSV_COLUMNS = (
+    "frame",
+    "time_seconds",
+    "track_id",
+    "class_id",
+    "class_name",
+    "is_observed",
+    "frames_since_seen",
+    "estimated_center_x",
+    "estimated_center_y",
+    "velocity_x_pixels_per_second",
+    "velocity_y_pixels_per_second",
+    "speed_pixels_per_second",
+    "direction_degrees",
+    "prediction_horizon_frames",
+    "predicted_frame",
+    "predicted_time_seconds",
+    "predicted_center_x",
+    "predicted_center_y",
 )
 
 
@@ -83,11 +109,17 @@ def track_csv_on_video(
     video_path: str | Path,
     output_path: str | Path,
     tracks_output_path: str | Path = DEFAULT_TRACKS_OUTPUT,
+    motion_output_path: str | Path = DEFAULT_MOTION_OUTPUT,
     *,
     maximum_frames: int | None = None,
     generate_video: bool = True,
+    export_motion_history: bool = True,
+    history_points: int = 30,
+    velocity_window: int = 5,
+    prediction_horizon_frames: int = 15,
+    inactive_timeout_frames: int = 30,
 ) -> dict[str, int | float | str]:
-    """Render canonical IDs and export the same visible tracks as CSV."""
+    """Render tracks/predictions and export canonical and motion CSV data."""
     try:
         import cv2
     except ImportError as exc:
@@ -99,6 +131,7 @@ def track_csv_on_video(
     video_path = Path(video_path)
     output_path = Path(output_path)
     tracks_output_path = Path(tracks_output_path)
+    motion_output_path = Path(motion_output_path)
     if not video_path.is_file():
         raise FileNotFoundError(f"Source video not found: {video_path}")
 
@@ -141,13 +174,31 @@ def track_csv_on_video(
 
     tracker = ByteTrackTracker(frame_rate=max(1, round(fps)))
     consolidator = IdentityConsolidator()
+    motion_predictor = MotionPredictor(
+        fps=fps,
+        history_points=history_points,
+        velocity_window=velocity_window,
+        prediction_horizon_frames=prediction_horizon_frames,
+        inactive_timeout_frames=inactive_timeout_frames,
+    )
     processed_frames = 0
     rendered_tracks = 0
+    motion_rows = 0
     suppressed_track_instances = 0
     unique_track_ids: set[int] = set()
     tracks_file = tracks_output_path.open("w", newline="", encoding="utf-8")
     tracks_writer = csv.DictWriter(tracks_file, fieldnames=TRACK_CSV_COLUMNS)
     tracks_writer.writeheader()
+    motion_file = None
+    motion_writer = None
+    if export_motion_history:
+        motion_output_path.parent.mkdir(parents=True, exist_ok=True)
+        motion_file = motion_output_path.open("w", newline="", encoding="utf-8")
+        motion_writer = csv.DictWriter(
+            motion_file,
+            fieldnames=MOTION_CSV_COLUMNS,
+        )
+        motion_writer.writeheader()
 
     try:
         while maximum_frames is None or processed_frames < maximum_frames:
@@ -165,6 +216,12 @@ def track_csv_on_video(
                 frame_id=processed_frames,
             )
             visible_tracks = consolidated.visible_tracks
+            frame_timestamp = processed_frames / fps
+            motion_snapshots = motion_predictor.update(
+                visible_tracks,
+                frame_id=processed_frames,
+                timestamp=frame_timestamp,
+            )
             unique_track_ids.update(track.track_id for track in visible_tracks)
             rendered_tracks += len(visible_tracks)
             suppressed_track_instances += len(consolidated.suppressed_tracks)
@@ -186,8 +243,36 @@ def track_csv_on_video(
                         "y2": track.y2,
                     }
                 )
+            if motion_writer is not None:
+                for snapshot in motion_snapshots:
+                    motion_writer.writerow(
+                        {
+                            "frame": snapshot.frame_id,
+                            "time_seconds": snapshot.timestamp,
+                            "track_id": snapshot.track_id,
+                            "class_id": snapshot.class_id,
+                            "class_name": snapshot.class_name,
+                            "is_observed": int(snapshot.observed),
+                            "frames_since_seen": snapshot.frames_since_seen,
+                            "estimated_center_x": snapshot.center_x,
+                            "estimated_center_y": snapshot.center_y,
+                            "velocity_x_pixels_per_second": snapshot.velocity_x,
+                            "velocity_y_pixels_per_second": snapshot.velocity_y,
+                            "speed_pixels_per_second": snapshot.speed,
+                            "direction_degrees": snapshot.direction_degrees,
+                            "prediction_horizon_frames": (
+                                snapshot.prediction_horizon_frames
+                            ),
+                            "predicted_frame": snapshot.predicted_frame,
+                            "predicted_time_seconds": snapshot.predicted_time,
+                            "predicted_center_x": snapshot.predicted_center_x,
+                            "predicted_center_y": snapshot.predicted_center_y,
+                        }
+                    )
+                    motion_rows += 1
             if generate_video and frame is not None and writer is not None:
                 annotated = render_tracking_ids(frame, visible_tracks)
+                annotated = render_motion_paths(annotated, motion_snapshots)
                 cv2.putText(
                     annotated,
                     (
@@ -212,6 +297,8 @@ def track_csv_on_video(
         if writer is not None:
             writer.release()
         tracks_file.close()
+        if motion_file is not None:
+            motion_file.close()
 
     required_frames = min(
         video_frame_count,
@@ -227,12 +314,18 @@ def track_csv_on_video(
         "frames": processed_frames,
         "fps": fps,
         "rendered_track_instances": rendered_tracks,
+        "motion_history_rows": motion_rows,
         "suppressed_duplicate_instances": suppressed_track_instances,
         "unique_track_ids": len(unique_track_ids),
         "output_video": (
             str(output_path.resolve()) if generate_video else "disabled"
         ),
         "output_tracks": str(tracks_output_path.resolve()),
+        "output_motion": (
+            str(motion_output_path.resolve())
+            if export_motion_history
+            else "disabled"
+        ),
     }
     print("Tracking complete")
     for name, value in summary.items():
@@ -263,6 +356,14 @@ def parse_args() -> argparse.Namespace:
         help="CSV output containing the canonical IDs visible in each frame.",
     )
     parser.add_argument(
+        "--motion-output",
+        type=Path,
+        default=None,
+        help=(
+            "CSV output containing active-track motion and prediction history."
+        ),
+    )
+    parser.add_argument(
         "--max-frames",
         type=int,
         default=None,
@@ -276,19 +377,64 @@ def parse_args() -> argparse.Namespace:
             "annotation, and encoding."
         ),
     )
+    parser.add_argument(
+        "--no-motion-output",
+        action="store_true",
+        help="Do not export the frame-by-frame motion/prediction history CSV.",
+    )
+    parser.add_argument(
+        "--history-points",
+        type=int,
+        default=30,
+        help="Recent observed center points retained per active track (default: 30).",
+    )
+    parser.add_argument(
+        "--velocity-window",
+        type=int,
+        default=5,
+        help="Recent point-to-point velocities averaged for smoothing (default: 5).",
+    )
+    parser.add_argument(
+        "--prediction-horizon",
+        type=int,
+        default=15,
+        help="Frames ahead for each short-term position prediction (default: 15).",
+    )
+    parser.add_argument(
+        "--inactive-timeout",
+        type=int,
+        default=30,
+        help="Missing frames retained before an inactive track is deleted (default: 30).",
+    )
     args = parser.parse_args()
     if args.max_frames is not None and args.max_frames <= 0:
         parser.error("--max-frames must be greater than zero")
     if args.dataset == "all" and any(
         value is not None
-        for value in (args.csv, args.video, args.output, args.tracks_output)
+        for value in (
+            args.csv,
+            args.video,
+            args.output,
+            args.tracks_output,
+            args.motion_output,
+        )
     ):
         parser.error(
-            "--csv, --video, --output, and --tracks-output cannot be combined "
-            "with --dataset all"
+            "--csv, --video, --output, --tracks-output, and --motion-output "
+            "cannot be combined with --dataset all"
         )
     if args.no_video and args.output is not None:
         parser.error("--output cannot be used with --no-video")
+    if args.no_motion_output and args.motion_output is not None:
+        parser.error("--motion-output cannot be used with --no-motion-output")
+    if args.history_points < 2:
+        parser.error("--history-points must be at least 2")
+    if args.velocity_window < 1:
+        parser.error("--velocity-window must be greater than zero")
+    if args.prediction_horizon < 1:
+        parser.error("--prediction-horizon must be greater than zero")
+    if args.inactive_timeout < 0:
+        parser.error("--inactive-timeout cannot be negative")
     return args
 
 
@@ -306,8 +452,14 @@ def run_from_args(arguments: argparse.Namespace) -> list[dict[str, int | float |
                 arguments.video or configured_video,
                 arguments.output or config.output_path,
                 arguments.tracks_output or config.tracks_output_path,
+                arguments.motion_output or config.motion_output_path,
                 maximum_frames=arguments.max_frames,
                 generate_video=not arguments.no_video,
+                export_motion_history=not arguments.no_motion_output,
+                history_points=arguments.history_points,
+                velocity_window=arguments.velocity_window,
+                prediction_horizon_frames=arguments.prediction_horizon,
+                inactive_timeout_frames=arguments.inactive_timeout,
             )
         )
     return summaries

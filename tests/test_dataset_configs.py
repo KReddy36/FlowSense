@@ -27,6 +27,7 @@ class DatasetConfigTests(unittest.TestCase):
             )
             self.assertIn(dataset_id, config.output_path.stem)
             self.assertIn(dataset_id, config.tracks_output_path.stem)
+            self.assertIn(dataset_id, config.motion_output_path.stem)
 
     def test_no_video_writes_only_canonical_csv(self) -> None:
         config = DATASETS["1"]
@@ -34,14 +35,17 @@ class DatasetConfigTests(unittest.TestCase):
         test_output_root.mkdir(parents=True, exist_ok=True)
         video_output = test_output_root / "_test_no_video_must_not_exist.mp4"
         tracks_output = test_output_root / "_test_no_video_tracks.csv"
+        motion_output = test_output_root / "_test_no_video_motion.csv"
         video_output.unlink(missing_ok=True)
         tracks_output.unlink(missing_ok=True)
+        motion_output.unlink(missing_ok=True)
         try:
             summary = track_csv_on_video(
                 config.csv_path,
                 config.video_path,
                 video_output,
                 tracks_output,
+                motion_output,
                 maximum_frames=2,
                 generate_video=False,
             )
@@ -49,9 +53,12 @@ class DatasetConfigTests(unittest.TestCase):
             self.assertEqual(summary["output_video"], "disabled")
             self.assertFalse(video_output.exists())
             self.assertTrue(tracks_output.is_file())
+            self.assertTrue(motion_output.is_file())
+            self.assertGreater(summary["motion_history_rows"], 0)
         finally:
             video_output.unlink(missing_ok=True)
             tracks_output.unlink(missing_ok=True)
+            motion_output.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
