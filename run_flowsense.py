@@ -146,6 +146,14 @@ def main() -> None:
     print(f"  Unique track IDs: {result.unique_track_ids}")
     print(f"  Counts by class: {result.counts_by_class}")
     print(f"  Counts by direction: {result.counts_by_direction}")
+    if result.prediction_accuracy_percent is None:
+        print("  Prediction accuracy: N/A (not enough eligible forecasts)")
+    else:
+        print(
+            "  Prediction accuracy: "
+            f"{result.prediction_accuracy_percent:.1f}% "
+            f"({result.prediction_accuracy_samples} forecasts)"
+        )
     print(f"  Annotated video: {result.output_video}")
     print(f"  HTML report: {result.output_report}")
     if result.intermediate_dir is not None:
