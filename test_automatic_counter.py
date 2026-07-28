@@ -6,12 +6,16 @@ from unittest.mock import patch
 
 from automatic_counter import (
     Detection,
+    analyze_tracks,
+    class_count_phrase,
     choose_counting_method,
     default_video_label,
     discover_csvs,
+    discover_kelvin_file,
     find_horizontal_passage,
     load_kelvin_class_totals,
     normalize_class_name,
+    refine_passage_classes,
     vehicle_id_rate_per_minute,
 )
 
@@ -127,9 +131,91 @@ class AutomaticCounterTests(unittest.TestCase):
         self.assertEqual(totals[("Video 4", "Bus")], 4)
         self.assertEqual(totals[("Video 4", "Motorcycle")], 3)
 
+    def test_kelvin_real_headers_and_annotated_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "kelvin.csv"
+            with path.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(
+                    [
+                        "Video number",
+                        "Direction of the road",
+                        "Cars crossing",
+                        "Trucks",
+                        "Buses",
+                        "Motorcycles",
+                        "Bicycles",
+                        "Pedestrians",
+                    ]
+                )
+                writer.writerow(
+                    ["Video 2", "down", 4, 2, "", 3, 0, 0]
+                )
+                writer.writerow(
+                    [
+                        "Video 2",
+                        "up",
+                        62,
+                        1,
+                        0,
+                        0,
+                        0,
+                        "3 (only one identified)",
+                    ]
+                )
+            totals = load_kelvin_class_totals(
+                path, {"video 2": "Video 2"}
+            )
+        self.assertEqual(totals[("Video 2", "Car")], 66)
+        self.assertEqual(totals[("Video 2", "Truck")], 3)
+        self.assertEqual(totals[("Video 2", "Motorcycle")], 3)
+        self.assertEqual(totals[("Video 2", "Pedestrian")], 3)
+
+    def test_kelvin_file_is_discovered_beside_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tracks = root / "member2_canonical_tracks.csv"
+            tracks.write_text("placeholder", encoding="utf-8")
+            kelvin = root / "kelvin_vehicle_counts (1).csv"
+            kelvin.write_text("placeholder", encoding="utf-8")
+            discovered = discover_kelvin_file([tracks])
+            self.assertIsNotNone(discovered)
+            assert discovered is not None
+            self.assertTrue(discovered.samefile(kelvin))
+
+    def test_passage_class_refinement_preserves_total(self) -> None:
+        rows = [
+            detection(0, 0.0, "car-crossing", "car", 100, 200),
+            detection(1, 1.0, "car-crossing", "car", 100, 280),
+            detection(2, 2.0, "car-crossing", "car", 100, 400),
+            detection(3, 2.5, "truck-fragment", "truck", 105, 500),
+            detection(4, 2.6, "truck-fragment", "truck", 106, 510),
+        ]
+        original = analyze_tracks(
+            detections=rows,
+            video="Video 2",
+            source_csv=Path("video2.csv"),
+            movement_threshold=50.0,
+            toward="down",
+            cross_traffic_ratio=0.35,
+            min_track_frames=2,
+            counting_method="passage",
+            passage_line_y=288.0,
+            passage_hysteresis_pixels=5.0,
+        )
+        refined = refine_passage_classes(original, 6.0)
+        counted = [item for item in refined if item.counted]
+        self.assertEqual(len(counted), 1)
+        self.assertEqual(counted[0].class_name, "Truck")
+
     def test_class_aliases(self) -> None:
         self.assertEqual(normalize_class_name("person"), "Pedestrian")
         self.assertEqual(normalize_class_name("motorbike"), "Motorcycle")
+
+    def test_class_pluralization(self) -> None:
+        self.assertEqual(class_count_phrase("Bus", 1), "1 bus")
+        self.assertEqual(class_count_phrase("Bus", 2), "2 buses")
+        self.assertEqual(class_count_phrase("Car", 2), "2 cars")
 
 
 if __name__ == "__main__":

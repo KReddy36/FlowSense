@@ -69,9 +69,27 @@
         <div class="metric"><strong>170</strong><span>Parked or excluded</span></div>
       </div>
       <h3>One-row summary</h3>
-      <div class="table-wrap"><table><thead><tr><th>Video</th><th>Moving objects counted</th><th>Vehicles counted</th><th>Pedestrians counted</th><th>Parked/excluded</th><th>Toward camera</th><th>Away from camera</th><th>Cross-traffic</th><th>Mixed/unclear</th><th>Cars</th><th>Trucks</th><th>Motorcycles</th><th>Bicycles</th><th>Pedestrians</th><th>Buses</th><th>Vans</th><th>Other classes</th></tr></thead><tbody><tr><td>Video 1</td><td>10</td><td>6</td><td>4</td><td>4</td><td>6</td><td>3</td><td>1</td><td>0</td><td>6</td><td>0</td><td>0</td><td>0</td><td>4</td><td>0</td><td>0</td><td>0</td></tr><tr><td>Video 2</td><td>72</td><td>72</td><td>0</td><td>128</td><td>67</td><td>5</td><td>0</td><td>0</td><td>72</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>Video 3</td><td>51</td><td>44</td><td>7</td><td>16</td><td>10</td><td>41</td><td>0</td><td>0</td><td>38</td><td>1</td><td>0</td><td>0</td><td>7</td><td>5</td><td>0</td><td>0</td></tr><tr><td>Video 4</td><td>236</td><td>232</td><td>4</td><td>22</td><td>231</td><td>5</td><td>0</td><td>0</td><td>213</td><td>14</td><td>1</td><td>0</td><td>4</td><td>4</td><td>0</td><td>0</td></tr></tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>Video</th><th>Moving objects counted</th><th>Vehicles counted</th><th>Pedestrians counted</th><th>Parked/excluded</th><th>Toward camera</th><th>Away from camera</th><th>Cross-traffic</th><th>Mixed/unclear</th><th>Cars</th><th>Trucks</th><th>Motorcycles</th><th>Bicycles</th><th>Pedestrians</th><th>Buses</th><th>Vans</th><th>Other classes</th></tr></thead><tbody><tr><td>Video 1</td><td>10</td><td>6</td><td>4</td><td>4</td><td>6</td><td>3</td><td>1</td><td>0</td><td>6</td><td>0</td><td>0</td><td>0</td><td>4</td><td>0</td><td>0</td><td>0</td></tr><tr><td>Video 2</td><td>72</td><td>72</td><td>0</td><td>128</td><td>67</td><td>5</td><td>0</td><td>0</td><td>68</td><td>2</td><td>2</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>Video 3</td><td>51</td><td>44</td><td>7</td><td>16</td><td>10</td><td>41</td><td>0</td><td>0</td><td>38</td><td>1</td><td>0</td><td>0</td><td>7</td><td>5</td><td>0</td><td>0</td></tr><tr><td>Video 4</td><td>236</td><td>232</td><td>4</td><td>22</td><td>231</td><td>5</td><td>0</td><td>0</td><td>213</td><td>14</td><td>1</td><td>0</td><td>4</td><td>4</td><td>0</td><td>0</td></tr></tbody></table></div>
     </div>
     
+        <div class="overview">
+          <p class="eyebrow">MANUAL COMPARISON</p>
+          <h2>FlowSense compared with Kelvin</h2>
+          <p>Vehicle totals and class error are compared by video. Direction
+          is excluded because the two direction-label systems differ.</p>
+          <div class="table-wrap"><table><thead><tr><th>Video</th><th>Dataset role</th><th>Kelvin vehicles</th><th>Automatic vehicles</th><th>Difference</th><th>Vehicle class absolute error</th></tr></thead><tbody><tr><td>Video 1</td><td>Development</td><td>8</td><td>6</td><td>-2</td><td>2</td></tr><tr><td>Video 2</td><td>Development</td><td>72</td><td>72</td><td>0</td><td>4</td></tr><tr><td>Video 3</td><td>Development</td><td>51</td><td>44</td><td>-7</td><td>7</td></tr><tr><td>Video 4</td><td>Evaluation</td><td>239</td><td>232</td><td>-7</td><td>9</td></tr></tbody></table></div>
+        </div>
+
+
+        <div class="overview">
+          <p class="eyebrow">CLASS COMPARISON</p>
+          <h2>Kelvin versus FlowSense by vehicle class</h2>
+          <p>This table makes the car, truck, motorcycle, bicycle, and bus
+          results visible separately instead of hiding them inside the total.</p>
+          <div class="table-wrap"><table><thead><tr><th>Video</th><th>Class</th><th>Kelvin count</th><th>Automatic count</th><th>Error (automatic - Kelvin)</th></tr></thead><tbody><tr><td>Video 1</td><td>Bicycle</td><td>0</td><td>0</td><td>0</td></tr><tr><td>Video 1</td><td>Bus</td><td>0</td><td>0</td><td>0</td></tr><tr><td>Video 1</td><td>Car</td><td>6</td><td>6</td><td>0</td></tr><tr><td>Video 1</td><td>Motorcycle</td><td>0</td><td>0</td><td>0</td></tr><tr><td>Video 1</td><td>Truck</td><td>2</td><td>0</td><td>-2</td></tr><tr><td>Video 2</td><td>Bicycle</td><td>0</td><td>0</td><td>0</td></tr><tr><td>Video 2</td><td>Bus</td><td>0</td><td>0</td><td>0</td></tr><tr><td>Video 2</td><td>Car</td><td>66</td><td>68</td><td>2</td></tr><tr><td>Video 2</td><td>Motorcycle</td><td>3</td><td>2</td><td>-1</td></tr><tr><td>Video 2</td><td>Truck</td><td>3</td><td>2</td><td>-1</td></tr><tr><td>Video 3</td><td>Bicycle</td><td>4</td><td>0</td><td>-4</td></tr><tr><td>Video 3</td><td>Bus</td><td>5</td><td>5</td><td>0</td></tr><tr><td>Video 3</td><td>Car</td><td>41</td><td>38</td><td>-3</td></tr><tr><td>Video 3</td><td>Motorcycle</td><td>0</td><td>0</td><td>0</td></tr><tr><td>Video 3</td><td>Truck</td><td>1</td><td>1</td><td>0</td></tr><tr><td>Video 4</td><td>Bicycle</td><td>0</td><td>0</td><td>0</td></tr><tr><td>Video 4</td><td>Bus</td><td>4</td><td>4</td><td>0</td></tr><tr><td>Video 4</td><td>Car</td><td>212</td><td>213</td><td>1</td></tr><tr><td>Video 4</td><td>Motorcycle</td><td>3</td><td>1</td><td>-2</td></tr><tr><td>Video 4</td><td>Truck</td><td>20</td><td>14</td><td>-6</td></tr></tbody></table></div>
+        </div>
+
+
             <section>
               <div class="section-heading">
                 <div>
@@ -116,10 +134,10 @@
                 <div class="metric"><strong>128</strong><span>Parked or excluded</span></div>
               </div>
               <p class="interpretation"><strong>Plain-English result:</strong>
-                5 cars moving away from the camera; 67 cars moving toward the camera.
+                5 cars moving away from the camera; 63 cars moving toward the camera; 2 motorcycles moving toward the camera; 2 trucks moving toward the camera.
               </p>
               <div class="two-column">
-                <div><h3>Counts by class</h3><div class="table-wrap"><table><thead><tr><th>Class</th><th>Count</th></tr></thead><tbody><tr><td>Car</td><td>72</td></tr></tbody></table></div></div>
+                <div><h3>Counts by class</h3><div class="table-wrap"><table><thead><tr><th>Class</th><th>Count</th></tr></thead><tbody><tr><td>Car</td><td>68</td></tr><tr><td>Motorcycle</td><td>2</td></tr><tr><td>Truck</td><td>2</td></tr></tbody></table></div></div>
                 <div><h3>Counts by direction</h3><div class="table-wrap"><table><thead><tr><th>Direction</th><th>Count</th></tr></thead><tbody><tr><td>Away from camera</td><td>5</td></tr><tr><td>Toward camera</td><td>67</td></tr></tbody></table></div></div>
               </div>
             </section>
@@ -142,7 +160,7 @@
                 <div class="metric"><strong>16</strong><span>Parked or excluded</span></div>
               </div>
               <p class="interpretation"><strong>Plain-English result:</strong>
-                3 buss moving away from the camera; 32 cars moving away from the camera; 5 pedestrians moving away from the camera; 1 truck moving away from the camera; 2 buss moving toward the camera; 6 cars moving toward the camera; 2 pedestrians moving toward the camera.
+                3 buses moving away from the camera; 32 cars moving away from the camera; 5 pedestrians moving away from the camera; 1 truck moving away from the camera; 2 buses moving toward the camera; 6 cars moving toward the camera; 2 pedestrians moving toward the camera.
               </p>
               <div class="two-column">
                 <div><h3>Counts by class</h3><div class="table-wrap"><table><thead><tr><th>Class</th><th>Count</th></tr></thead><tbody><tr><td>Bus</td><td>5</td></tr><tr><td>Car</td><td>38</td></tr><tr><td>Pedestrian</td><td>7</td></tr><tr><td>Truck</td><td>1</td></tr></tbody></table></div></div>
@@ -168,7 +186,7 @@
                 <div class="metric"><strong>22</strong><span>Parked or excluded</span></div>
               </div>
               <p class="interpretation"><strong>Plain-English result:</strong>
-                2 cars moving away from the camera; 3 pedestrians moving away from the camera; 4 buss moving toward the camera; 211 cars moving toward the camera; 1 motorcycle moving toward the camera; 1 pedestrian moving toward the camera; 14 trucks moving toward the camera.
+                2 cars moving away from the camera; 3 pedestrians moving away from the camera; 4 buses moving toward the camera; 211 cars moving toward the camera; 1 motorcycle moving toward the camera; 1 pedestrian moving toward the camera; 14 trucks moving toward the camera.
               </p>
               <div class="two-column">
                 <div><h3>Counts by class</h3><div class="table-wrap"><table><thead><tr><th>Class</th><th>Count</th></tr></thead><tbody><tr><td>Bus</td><td>4</td></tr><tr><td>Car</td><td>213</td></tr><tr><td>Motorcycle</td><td>1</td></tr><tr><td>Pedestrian</td><td>4</td></tr><tr><td>Truck</td><td>14</td></tr></tbody></table></div></div>

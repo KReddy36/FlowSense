@@ -1,0 +1,5 @@
+Video,Dataset role,Kelvin vehicles,Automatic vehicles,Difference,Absolute vehicle error,Vehicle class absolute error,Kelvin pedestrians,Automatic pedestrians
+Video 1,Development,8,6,-2,2,2,3,4
+Video 2,Development,72,72,0,0,4,0,0
+Video 3,Development,51,44,-7,7,7,5,7
+Video 4,Evaluation,239,232,-7,7,9,0,4
