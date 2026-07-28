@@ -1074,7 +1074,10 @@ def write_html_report(
                   <p class="eyebrow">VIDEO RESULT</p>
                   <h2>{html.escape(video)}</h2>
                   <p class="source-file">Source file:
-                    {html.escape(Path(str(settings['source_csv'])).name)}
+                    {html.escape(str(settings.get(
+                        'source_display_name',
+                        Path(str(settings['source_csv'])).name,
+                    )))}
                   </p>
                 </div>
                 <span class="threshold">{html.escape(method_label)}</span>
@@ -1096,6 +1099,17 @@ def write_html_report(
             """
         )
 
+    footer_text = (
+        "Generated from the uploaded video by the one-command FlowSense pipeline."
+        if any(
+            bool(video_settings[video].get("standalone_report"))
+            for video in videos
+        )
+        else (
+            "Open object_movement_audit.csv only when you need to check "
+            "an individual ID."
+        )
+    )
     report = f"""<!doctype html>
 <html lang="en">
 <head>
@@ -1173,7 +1187,7 @@ def write_html_report(
     {class_comparison_section}
     {''.join(sections)}
     <footer>
-      Open object_movement_audit.csv only when you need to check an individual ID.
+      {html.escape(footer_text)}
     </footer>
   </main>
 </body>
@@ -1634,6 +1648,15 @@ def run(args: argparse.Namespace) -> dict[str, object]:
     csv_paths.sort(key=lambda path: (assigned_numbers[path], str(path).lower()))
 
     config = load_config(args.config)
+    pipeline_video_label = getattr(args, "video_label", None)
+    if pipeline_video_label is not None:
+        if len(csv_paths) != 1:
+            raise ValueError("video_label can only be used with one input CSV")
+        config[str(csv_paths[0].resolve())] = {
+            "video_label": str(pipeline_video_label)
+        }
+    source_display_name = getattr(args, "source_display_name", None)
+    standalone_report = bool(getattr(args, "standalone_report", False))
     all_results: list[TrackResult] = []
     videos: list[str] = []
     video_settings: dict[str, dict[str, object]] = {}
@@ -1704,6 +1727,12 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         durations[video] = max(row.time_seconds for row in detections)
         video_settings[video] = {
             "source_csv": str(path.resolve()),
+            "source_display_name": (
+                str(source_display_name)
+                if source_display_name is not None
+                else path.name
+            ),
+            "standalone_report": standalone_report,
             "id_column_used": id_column,
             "movement_threshold_pixels": threshold,
             "toward_camera_image_direction": toward,
@@ -1935,6 +1964,41 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         json.dump(summary, handle, indent=2)
         handle.write("\n")
     return summary
+
+
+def run_single_video_report(
+    canonical_tracks: str | Path,
+    output_dir: str | Path,
+    *,
+    video_label: str,
+    source_video: str | Path,
+    movement_threshold_pixels: float = 50.0,
+    toward_camera: str = "down",
+    counting_mode: str = "auto",
+) -> dict[str, object]:
+    """Generate Member 3's report for one pipeline-produced tracking file."""
+    arguments = argparse.Namespace(
+        inputs=[str(Path(canonical_tracks))],
+        movement_threshold_pixels=movement_threshold_pixels,
+        toward_camera=toward_camera,
+        cross_traffic_ratio=0.15,
+        interval_seconds=5,
+        min_track_frames=1,
+        counting_mode=counting_mode,
+        passage_line_fraction=0.40,
+        passage_hysteresis_pixels=15.0,
+        fragmentation_ids_per_minute=150.0,
+        class_evidence_window_seconds=6.0,
+        disable_passage_class_refinement=False,
+        config=None,
+        manual_counts=None,
+        evaluation_video=video_label,
+        output_dir=Path(output_dir),
+        video_label=video_label,
+        source_display_name=Path(source_video).name,
+        standalone_report=True,
+    )
+    return run(arguments)
 
 
 def print_summary(summary: dict[str, object], output_dir: Path) -> None:

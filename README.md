@@ -3,10 +3,65 @@
 FlowSense uses pretrained YOLO detections and ByteTrack to identify, track, and
 analyze vehicles and pedestrians in prerecorded traffic footage.
 
-This repository includes Member 2's tracking pipeline. It reads Member 1's
-frame-level detection CSV, assigns persistent IDs, consolidates duplicate or
-briefly interrupted identities, renders the results over the original video,
-and exports canonical tracking data for the analytics and dashboard components.
+## One-command pipeline
+
+The normal workflow now accepts a video directly and runs every stage:
+
+```text
+input video
+  -> YOLO road-user detection
+  -> ByteTrack and identity consolidation
+  -> trajectory smoothing and short-term prediction
+  -> automatic traffic counting
+  -> annotated video and standalone HTML report
+```
+
+Install the project once:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+Then analyze any video with one command:
+
+```powershell
+.\.venv\Scripts\python.exe run_flowsense.py "path\to\traffic_video.mp4"
+```
+
+The default `results/` directory contains only:
+
+- `<video-name>_flowsense.mp4` — boxes, canonical IDs, observed trajectories,
+  and dashed short-term predictions.
+- `<video-name>_report.html` — Member 3's traffic-count report.
+
+The first real YOLO run downloads the pretrained `yolo11n.pt` weights if they
+are not already available. Intermediate detection, canonical-track, motion,
+and counting CSV files are created in a temporary workspace and removed
+automatically. To retain them for debugging, add `--keep-intermediates`.
+
+Useful options:
+
+```powershell
+# Quick five-frame integration check
+.\.venv\Scripts\python.exe run_flowsense.py video.mp4 --max-frames 5
+
+# Use a GPU and custom output folder
+.\.venv\Scripts\python.exe run_flowsense.py video.mp4 `
+  --device 0 `
+  --output-dir my_results
+
+# Replace an existing result pair
+.\.venv\Scripts\python.exe run_flowsense.py video.mp4 --overwrite
+```
+
+Run `python run_flowsense.py --help` for detection, prediction, and counting
+settings. Existing CSV-based commands remain available below for reproducing
+the original member-by-member datasets.
+
+The unified command connects the team's production stages directly. The
+original member-by-member scripts and datasets remain in the repository as
+legacy reproduction tools.
 
 ## Motion prediction
 
