@@ -1,0 +1,6 @@
+,Cars crossing,Trucks,Buses,Motercycles,Bicycles,Pedestrians,Stationary vehicles excluded,Uncertain cases
+Video 1,6,2,0,0,0,3(only one identified),2,
+Video 2(down),4,2,,3,0,0,0,
+Video 2(up),62,1,0,0,0,0,0,
+Video 3(up),33,1,3,0,3,5,0,
+Video 3(down),8,0,2,0,1,0,0,1 pushing but not riding
