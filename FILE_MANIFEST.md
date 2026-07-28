@@ -5,6 +5,15 @@ files.
 
 ## Production files — include in the final project
 
+### Unified application
+
+- `run_flowsense.py` — one-command command-line entry point
+- `flowsense/pipeline.py` — video decoding, tracking/prediction orchestration,
+  temporary artifact management, and final artifact publishing
+- `flowsense/yolo_detector.py` — in-memory Ultralytics YOLO adapter
+- `automatic_counter.py` — traffic counting and standalone HTML report
+- `requirements.txt`
+
 ### Member 2 source code
 
 - `track_member1_video.py`
@@ -54,6 +63,8 @@ Generated at runtime under `outputs/`:
 - `tests/test_dataset_configs.py`
 - `tests/test_motion_prediction.py`
 - `tests/test_identity_consolidator.py`
+- `tests/test_yolo_detector.py`
+- `tests/test_end_to_end_pipeline.py`
 - `tests/fixtures/member1_sample.csv`
 
 Keep these test-only files in GitHub until integration and final regression
@@ -67,3 +78,5 @@ submission if only runtime files are requested.
 - `.vscode/`
 - `fromMember1/` (its relevant files are stored in repository-native folders)
 - `outputs/` previews and local environment checks
+- `results/` generated final videos and reports
+- downloaded `*.pt` model weights
