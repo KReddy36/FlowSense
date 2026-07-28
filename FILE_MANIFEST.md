@@ -10,6 +10,8 @@ files.
 - `track_member1_video.py`
 - `flowsense/__init__.py`
 - `flowsense/csv_detections.py`
+- `flowsense/tracking/motion_prediction.py` — bounded trajectory histories,
+  smoothed velocity, missed-detection handling, and position prediction
 - `flowsense/tracking/__init__.py`
 - `flowsense/tracking/bytetrack_tracker.py`
 - `flowsense/tracking/identity_consolidator.py`
@@ -30,6 +32,11 @@ files.
 - `tracking_data/member2_canonical_tracks2.csv` — canonical results for video 2
 - `tracking_data/member2_canonical_tracks3.csv` — canonical results for video 3
 - `tracking_data/member2_canonical_tracks4.csv` — canonical results for video 4
+
+Generated at runtime under `outputs/`:
+
+- `member2_motion_predictions.csv` (and suffixed datasets 2–4) — active-track
+  motion and prediction history for statistics/dashboard use
 - `videos/source_traffic.mp4` — original footage needed to reproduce the result
 - `videos/flowsense_tracking2.mp4` — Member 1 video associated with CSV 2
 - `videos/flowsense_tracking3.mp4` — Member 1 video associated with CSV 3
@@ -45,6 +52,7 @@ files.
 - `tests/test_csv_detections.py`
 - `tests/test_day1_tracking.py`
 - `tests/test_dataset_configs.py`
+- `tests/test_motion_prediction.py`
 - `tests/test_identity_consolidator.py`
 - `tests/fixtures/member1_sample.csv`
 

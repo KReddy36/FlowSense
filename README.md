@@ -8,6 +8,47 @@ frame-level detection CSV, assigns persistent IDs, consolidates duplicate or
 briefly interrupted identities, renders the results over the original video,
 and exports canonical tracking data for the analytics and dashboard components.
 
+## Motion prediction
+
+The tracking pipeline maintains a bounded rolling center-point history for
+each active canonical track. It averages recent point-to-point velocities to
+reduce detection jitter, keeps predicting temporarily missing tracks, and
+removes prediction state after a configurable inactivity timeout.
+
+Observed trajectories are solid in the annotated video. Short-term linear
+predictions are dashed and end in an outlined marker.
+
+Run a short prediction preview:
+
+```powershell
+python track_member1_video.py `
+    --dataset 1 `
+    --max-frames 300 `
+    --history-points 30 `
+    --velocity-window 5 `
+    --prediction-horizon 15 `
+    --inactive-timeout 30
+```
+
+The full frame-by-frame motion history is streamed to
+`outputs/member2_motion_predictions.csv`; it is not retained in memory. Use
+`--motion-output PATH` to choose another file or `--no-motion-output` to
+disable it. The existing canonical track CSV format remains unchanged.
+
+The motion CSV contains one row per active track per frame:
+
+```text
+frame,time_seconds,track_id,class_id,class_name,is_observed,
+frames_since_seen,estimated_center_x,estimated_center_y,
+velocity_x_pixels_per_second,velocity_y_pixels_per_second,
+speed_pixels_per_second,direction_degrees,prediction_horizon_frames,
+predicted_frame,predicted_time_seconds,predicted_center_x,predicted_center_y
+```
+
+`is_observed=0` means the row is a temporary estimate during a missed
+detection. Statistics and dashboard code can join this file to the canonical
+CSV using `frame` and `track_id`.
+
 ## Repository inputs and outputs
 
 Required inputs:

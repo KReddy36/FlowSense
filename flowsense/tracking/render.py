@@ -6,6 +6,7 @@ from collections.abc import Sequence
 
 import numpy as np
 
+from .motion_prediction import MotionSnapshot
 from .schemas import TrackedDetection
 
 
@@ -46,4 +47,49 @@ def render_tracking_ids(
             2,
             cv2.LINE_AA,
         )
+    return annotated
+
+
+def render_motion_paths(
+    frame: np.ndarray, snapshots: Sequence[MotionSnapshot]
+) -> np.ndarray:
+    """Draw solid observed paths and dashed short-term predictions."""
+    try:
+        import cv2
+    except ImportError as exc:
+        raise RuntimeError(
+            "Rendering dependencies are missing. Run: pip install -r requirements.txt"
+        ) from exc
+
+    annotated = frame.copy()
+    for snapshot in snapshots:
+        color = _COLORS[snapshot.track_id % len(_COLORS)]
+        observed_points = [
+            (int(round(point.x)), int(round(point.y)))
+            for point in snapshot.observed_points
+        ]
+        if len(observed_points) >= 2:
+            cv2.polylines(
+                annotated,
+                [np.asarray(observed_points, dtype=np.int32)],
+                False,
+                color,
+                3,
+                cv2.LINE_AA,
+            )
+
+        predicted_points = [
+            (int(round(x)), int(round(y)))
+            for x, y in snapshot.predicted_points
+        ]
+        for index in range(0, len(predicted_points) - 1, 2):
+            cv2.line(
+                annotated,
+                predicted_points[index],
+                predicted_points[index + 1],
+                color,
+                2,
+                cv2.LINE_AA,
+            )
+        cv2.circle(annotated, predicted_points[-1], 5, color, 2, cv2.LINE_AA)
     return annotated
