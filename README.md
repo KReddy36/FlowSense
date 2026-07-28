@@ -73,6 +73,25 @@ removes prediction state after a configurable inactivity timeout.
 Observed trajectories are solid in the annotated video. Short-term linear
 predictions are dashed and end in an outlined marker.
 
+### Measured prediction accuracy
+
+Run the reproducible evaluation:
+
+```powershell
+.\.venv\Scripts\python.exe evaluate_motion_prediction.py
+```
+
+It compares the actual `MotionPredictor` output with the same canonical track's
+observed center 15 frames later. The baseline assumes the object stays at its
+current center. Across the four repository videos, the measured median error is
+10.012 pixels versus 34.79 pixels for the stationary baseline, a 71.22%
+reduction in median error. The predictor wins on 83.36% of 61,388 eligible
+samples.
+
+See `PREDICTION_EVALUATION.md` for methodology, per-video results, and
+limitations. The full numeric table is
+`easy_results/prediction_accuracy.csv`.
+
 Run a short prediction preview:
 
 ```powershell

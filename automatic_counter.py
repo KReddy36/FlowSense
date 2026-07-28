@@ -819,11 +819,20 @@ def write_csv(
         writer.writerows(rows)
 
 
+def portable_path(path: str | Path) -> str:
+    """Return a reproducible relative path without exposing a home directory."""
+    candidate = Path(path)
+    try:
+        return candidate.resolve().relative_to(Path.cwd().resolve()).as_posix()
+    except ValueError:
+        return candidate.name
+
+
 def audit_rows(results: list[TrackResult]) -> list[dict[str, object]]:
     return [
         {
             "Video": item.video,
-            "Source CSV": item.source_csv,
+            "Source CSV": portable_path(item.source_csv),
             "Canonical ID": item.canonical_id,
             "Class": item.class_name,
             "Rows": item.row_count,
@@ -1726,7 +1735,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         all_results.extend(results)
         durations[video] = max(row.time_seconds for row in detections)
         video_settings[video] = {
-            "source_csv": str(path.resolve()),
+            "source_csv": portable_path(path),
             "source_display_name": (
                 str(source_display_name)
                 if source_display_name is not None
@@ -1953,7 +1962,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         "kelvin_video_comparison_file": comparison_video_name,
         "kelvin_counts_supplied": bool(kelvin_class_totals),
         "kelvin_counts_source": (
-            str(manual_counts_path.resolve())
+            portable_path(manual_counts_path)
             if manual_counts_path is not None
             else None
         ),

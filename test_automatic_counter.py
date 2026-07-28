@@ -15,6 +15,7 @@ from automatic_counter import (
     find_horizontal_passage,
     load_kelvin_class_totals,
     normalize_class_name,
+    portable_path,
     refine_passage_classes,
     vehicle_id_rate_per_minute,
 )
@@ -42,6 +43,15 @@ def detection(
 
 
 class AutomaticCounterTests(unittest.TestCase):
+    def test_portable_path_removes_machine_specific_parent(self) -> None:
+        external_file = Path(
+            r"D:\MyProfile\Downloads\FlowSense\member2_canonical_tracks.csv"
+        )
+
+        result = portable_path(external_file)
+
+        self.assertEqual(result, "member2_canonical_tracks.csv")
+
     def test_repository_discovery_prefers_tracking_data_inputs(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

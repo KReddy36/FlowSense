@@ -1,0 +1,6 @@
+Dataset,Samples,Track IDs,Prediction horizon (frames),Prediction horizon (seconds),Median prediction error (px),Mean prediction error (px),P90 prediction error (px),Median stationary baseline error (px),Mean stationary baseline error (px),Median improvement vs baseline (%),Prediction win rate (%)
+Video 1,2144,12,15,0.6,3.314,12.913,42.39,1.529,46.774,-116.74,41.6
+Video 2,13168,164,15,0.5005,8.683,15.684,38.006,30.363,45.49,71.4,95.41
+Video 3,8271,51,15,0.6,8.643,20.715,56.237,27.289,52.572,68.33,85.2
+Video 4,37805,267,15,0.5,11.246,24.381,63.903,41.002,71.971,72.57,81.12
+All videos,61388,494,15,0.5,10.012,21.621,55.414,34.79,62.797,71.22,83.36
