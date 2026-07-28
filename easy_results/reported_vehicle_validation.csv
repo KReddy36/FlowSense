@@ -1,0 +1,5 @@
+Video,Dataset role,Kelvin reported vehicles,FlowSense vehicles,Difference
+Video 1,Development,8,6,-2
+Video 2,Development,72,72,0
+Video 3,Development,51,44,-7
+Video 4,Evaluation,239,232,-7

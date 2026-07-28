@@ -1,0 +1,13 @@
+Video,Dataset role,Class,Kelvin count,Automatic count,Error (automatic - Kelvin),Absolute error,Percent error
+Video 1,Development,Car,,6,,,
+Video 1,Development,Pedestrian,,4,,,
+Video 2,Development,Car,,72,,,
+Video 3,Development,Bus,,5,,,
+Video 3,Development,Car,,38,,,
+Video 3,Development,Pedestrian,,7,,,
+Video 3,Development,Truck,,1,,,
+Video 4,Evaluation,Bus,,4,,,
+Video 4,Evaluation,Car,,213,,,
+Video 4,Evaluation,Motorcycle,,1,,,
+Video 4,Evaluation,Pedestrian,,4,,,
+Video 4,Evaluation,Truck,,14,,,

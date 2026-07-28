@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FlowSense Traffic Results</title>
+  <style>
+    :root {
+      --navy: #132238; --blue: #2563eb; --pale: #eff6ff;
+      --line: #dbe4f0; --muted: #5f6f82; --white: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: #f4f7fb; color: var(--navy);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    main { max-width: 1120px; margin: 0 auto; padding: 40px 22px 64px; }
+    header {
+      color: white; padding: 34px; border-radius: 20px;
+      background: linear-gradient(135deg, #0f172a, #1d4ed8);
+      box-shadow: 0 18px 48px rgba(29, 78, 216, .18);
+    }
+    header h1 { margin: 4px 0 8px; font-size: clamp(30px, 5vw, 48px); }
+    header p { margin: 0; max-width: 760px; color: #dbeafe; }
+    .eyebrow { margin: 0; letter-spacing: .14em; font-size: 12px; font-weight: 800; color: #60a5fa; }
+    .overview, section {
+      margin-top: 24px; padding: 26px; border: 1px solid var(--line);
+      border-radius: 18px; background: var(--white);
+      box-shadow: 0 8px 28px rgba(15, 23, 42, .05);
+    }
+    .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin: 18px 0; }
+    .metric { min-height: 112px; padding: 20px; border-radius: 14px; background: #f8fafc; border: 1px solid var(--line); }
+    .metric.primary { color: #1e40af; background: var(--pale); border-color: #bfdbfe; }
+    .metric strong { display: block; font-size: 34px; line-height: 1; margin-bottom: 10px; }
+    .metric span { color: var(--muted); font-weight: 650; }
+    .section-heading { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; }
+    .source-file { margin: -6px 0 10px; color: var(--muted); font-size: 13px; }
+    h2, h3 { margin: 4px 0 12px; }
+    .threshold { padding: 7px 11px; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: 13px; font-weight: 750; }
+    .interpretation { padding: 15px 17px; border-left: 4px solid var(--blue); background: var(--pale); border-radius: 8px; }
+    .two-column { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { color: #334155; background: #eef2f7; text-align: left; }
+    th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+    footer { margin-top: 24px; color: var(--muted); font-size: 13px; text-align: center; }
+    @media (max-width: 720px) {
+      .metrics, .two-column { grid-template-columns: 1fr; }
+      .section-heading { display: block; }
+      .threshold { display: inline-block; margin-bottom: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">FLOWSENSE</p>
+      <h1>Automatic Traffic Results</h1>
+      <p>Each moving canonical ID is counted exactly once. Parked and
+      stationary tracks are excluded automatically.</p>
+    </header>
+    <div class="overview">
+      <p class="eyebrow">ALL VIDEOS</p>
+      <h2>Results at a glance</h2>
+      <div class="metrics">
+        <div class="metric primary"><strong>4</strong><span>Videos analyzed</span></div>
+        <div class="metric primary"><strong>369</strong><span>Moving objects counted</span></div>
+        <div class="metric"><strong>170</strong><span>Parked or excluded</span></div>
+      </div>
+      <h3>One-row summary</h3>
+      <div class="table-wrap"><table><thead><tr><th>Video</th><th>Moving objects counted</th><th>Vehicles counted</th><th>Pedestrians counted</th><th>Parked/excluded</th><th>Toward camera</th><th>Away from camera</th><th>Cross-traffic</th><th>Mixed/unclear</th><th>Cars</th><th>Trucks</th><th>Motorcycles</th><th>Bicycles</th><th>Pedestrians</th><th>Buses</th><th>Vans</th><th>Other classes</th></tr></thead><tbody><tr><td>Video 1</td><td>10</td><td>6</td><td>4</td><td>4</td><td>6</td><td>3</td><td>1</td><td>0</td><td>6</td><td>0</td><td>0</td><td>0</td><td>4</td><td>0</td><td>0</td><td>0</td></tr><tr><td>Video 2</td><td>72</td><td>72</td><td>0</td><td>128</td><td>67</td><td>5</td><td>0</td><td>0</td><td>72</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>Video 3</td><td>51</td><td>44</td><td>7</td><td>16</td><td>10</td><td>41</td><td>0</td><td>0</td><td>38</td><td>1</td><td>0</td><td>0</td><td>7</td><td>5</td><td>0</td><td>0</td></tr><tr><td>Video 4</td><td>236</td><td>232</td><td>4</td><td>22</td><td>231</td><td>5</td><td>0</td><td>0</td><td>213</td><td>14</td><td>1</td><td>0</td><td>4</td><td>4</td><td>0</td><td>0</td></tr></tbody></table></div>
+    </div>
+    
+            <section>
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">VIDEO RESULT</p>
+                  <h2>Video 1</h2>
+                  <p class="source-file">Source file:
+                    member2_canonical_tracks.csv
+                  </p>
+                </div>
+                <span class="threshold">Movement threshold: 50 px</span>
+              </div>
+              <div class="metrics">
+                <div class="metric primary"><strong>10</strong><span>Moving objects counted</span></div>
+                <div class="metric primary"><strong>6</strong><span>Vehicles counted</span></div>
+                <div class="metric"><strong>4</strong><span>Pedestrians counted</span></div>
+                <div class="metric"><strong>4</strong><span>Parked or excluded</span></div>
+              </div>
+              <p class="interpretation"><strong>Plain-English result:</strong>
+                3 pedestrians moving away from the camera; 1 pedestrian moving across the camera view; 6 cars moving toward the camera.
+              </p>
+              <div class="two-column">
+                <div><h3>Counts by class</h3><div class="table-wrap"><table><thead><tr><th>Class</th><th>Count</th></tr></thead><tbody><tr><td>Car</td><td>6</td></tr><tr><td>Pedestrian</td><td>4</td></tr></tbody></table></div></div>
+                <div><h3>Counts by direction</h3><div class="table-wrap"><table><thead><tr><th>Direction</th><th>Count</th></tr></thead><tbody><tr><td>Away from camera</td><td>3</td></tr><tr><td>Cross-traffic</td><td>1</td></tr><tr><td>Toward camera</td><td>6</td></tr></tbody></table></div></div>
+              </div>
+            </section>
+            
+            <section>
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">VIDEO RESULT</p>
+                  <h2>Video 2</h2>
+                  <p class="source-file">Source file:
+                    member2_canonical_tracks2.csv
+                  </p>
+                </div>
+                <span class="threshold">Passage line at y=288</span>
+              </div>
+              <div class="metrics">
+                <div class="metric primary"><strong>72</strong><span>Moving objects counted</span></div>
+                <div class="metric primary"><strong>72</strong><span>Vehicles counted</span></div>
+                <div class="metric"><strong>0</strong><span>Pedestrians counted</span></div>
+                <div class="metric"><strong>128</strong><span>Parked or excluded</span></div>
+              </div>
+              <p class="interpretation"><strong>Plain-English result:</strong>
+                5 cars moving away from the camera; 67 cars moving toward the camera.
+              </p>
+              <div class="two-column">
+                <div><h3>Counts by class</h3><div class="table-wrap"><table><thead><tr><th>Class</th><th>Count</th></tr></thead><tbody><tr><td>Car</td><td>72</td></tr></tbody></table></div></div>
+                <div><h3>Counts by direction</h3><div class="table-wrap"><table><thead><tr><th>Direction</th><th>Count</th></tr></thead><tbody><tr><td>Away from camera</td><td>5</td></tr><tr><td>Toward camera</td><td>67</td></tr></tbody></table></div></div>
+              </div>
+            </section>
+            
+            <section>
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">VIDEO RESULT</p>
+                  <h2>Video 3</h2>
+                  <p class="source-file">Source file:
+                    member2_canonical_tracks3.csv
+                  </p>
+                </div>
+                <span class="threshold">Movement threshold: 50 px</span>
+              </div>
+              <div class="metrics">
+                <div class="metric primary"><strong>51</strong><span>Moving objects counted</span></div>
+                <div class="metric primary"><strong>44</strong><span>Vehicles counted</span></div>
+                <div class="metric"><strong>7</strong><span>Pedestrians counted</span></div>
+                <div class="metric"><strong>16</strong><span>Parked or excluded</span></div>
+              </div>
+              <p class="interpretation"><strong>Plain-English result:</strong>
+                3 buss moving away from the camera; 32 cars moving away from the camera; 5 pedestrians moving away from the camera; 1 truck moving away from the camera; 2 buss moving toward the camera; 6 cars moving toward the camera; 2 pedestrians moving toward the camera.
+              </p>
+              <div class="two-column">
+                <div><h3>Counts by class</h3><div class="table-wrap"><table><thead><tr><th>Class</th><th>Count</th></tr></thead><tbody><tr><td>Bus</td><td>5</td></tr><tr><td>Car</td><td>38</td></tr><tr><td>Pedestrian</td><td>7</td></tr><tr><td>Truck</td><td>1</td></tr></tbody></table></div></div>
+                <div><h3>Counts by direction</h3><div class="table-wrap"><table><thead><tr><th>Direction</th><th>Count</th></tr></thead><tbody><tr><td>Away from camera</td><td>41</td></tr><tr><td>Toward camera</td><td>10</td></tr></tbody></table></div></div>
+              </div>
+            </section>
+            
+            <section>
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">VIDEO RESULT</p>
+                  <h2>Video 4</h2>
+                  <p class="source-file">Source file:
+                    member2_canonical_tracks4.csv
+                  </p>
+                </div>
+                <span class="threshold">Movement threshold: 50 px</span>
+              </div>
+              <div class="metrics">
+                <div class="metric primary"><strong>236</strong><span>Moving objects counted</span></div>
+                <div class="metric primary"><strong>232</strong><span>Vehicles counted</span></div>
+                <div class="metric"><strong>4</strong><span>Pedestrians counted</span></div>
+                <div class="metric"><strong>22</strong><span>Parked or excluded</span></div>
+              </div>
+              <p class="interpretation"><strong>Plain-English result:</strong>
+                2 cars moving away from the camera; 3 pedestrians moving away from the camera; 4 buss moving toward the camera; 211 cars moving toward the camera; 1 motorcycle moving toward the camera; 1 pedestrian moving toward the camera; 14 trucks moving toward the camera.
+              </p>
+              <div class="two-column">
+                <div><h3>Counts by class</h3><div class="table-wrap"><table><thead><tr><th>Class</th><th>Count</th></tr></thead><tbody><tr><td>Bus</td><td>4</td></tr><tr><td>Car</td><td>213</td></tr><tr><td>Motorcycle</td><td>1</td></tr><tr><td>Pedestrian</td><td>4</td></tr><tr><td>Truck</td><td>14</td></tr></tbody></table></div></div>
+                <div><h3>Counts by direction</h3><div class="table-wrap"><table><thead><tr><th>Direction</th><th>Count</th></tr></thead><tbody><tr><td>Away from camera</td><td>5</td></tr><tr><td>Toward camera</td><td>231</td></tr></tbody></table></div></div>
+              </div>
+            </section>
+            
+    <footer>
+      Open object_movement_audit.csv only when you need to check an individual ID.
+    </footer>
+  </main>
+</body>
+</html>
