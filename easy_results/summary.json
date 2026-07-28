@@ -17,7 +17,7 @@
   },
   "videos": {
     "Video 1": {
-      "source_csv": "/workspace/scratch/a2b8e7726448/upload/member2_canonical_tracks.csv",
+      "source_csv": "D:\\MyProfile\\Downloads\\FlowSense_v6_ready_to_run (1)\\member2_canonical_tracks.csv",
       "id_column_used": "track_id",
       "movement_threshold_pixels": 50.0,
       "toward_camera_image_direction": "down",
@@ -28,9 +28,9 @@
       "passage_line_y": null,
       "passage_class_refinement": false,
       "class_evidence_window_seconds": null,
-      "canonical_ids": 14,
+      "canonical_ids": 15,
       "moving_ids_counted": 10,
-      "parked_or_excluded_ids": 4,
+      "parked_or_excluded_ids": 5,
       "counts_by_class": {
         "Car": 6,
         "Pedestrian": 4
@@ -42,104 +42,104 @@
       }
     },
     "Video 2": {
-      "source_csv": "/workspace/scratch/a2b8e7726448/upload/member2_canonical_tracks2.csv",
+      "source_csv": "D:\\MyProfile\\Downloads\\FlowSense_v6_ready_to_run (1)\\member2_canonical_tracks2.csv",
       "id_column_used": "track_id",
       "movement_threshold_pixels": 50.0,
       "toward_camera_image_direction": "down",
       "requested_counting_mode": "auto",
       "selected_counting_method": "passage",
-      "vehicle_ids_per_minute": 209.808,
+      "vehicle_ids_per_minute": 240.537,
       "passage_line_fraction": 0.4,
       "passage_line_y": 288.0,
       "passage_class_refinement": true,
       "class_evidence_window_seconds": 6.0,
-      "canonical_ids": 200,
-      "moving_ids_counted": 72,
-      "parked_or_excluded_ids": 128,
+      "canonical_ids": 229,
+      "moving_ids_counted": 77,
+      "parked_or_excluded_ids": 152,
       "counts_by_class": {
-        "Car": 68,
+        "Car": 70,
         "Motorcycle": 2,
-        "Truck": 2
+        "Truck": 5
       },
       "counts_by_direction": {
         "Away from camera": 5,
-        "Toward camera": 67
+        "Toward camera": 72
       }
     },
     "Video 3": {
-      "source_csv": "/workspace/scratch/a2b8e7726448/upload/member2_canonical_tracks3.csv",
+      "source_csv": "D:\\MyProfile\\Downloads\\FlowSense_v6_ready_to_run (1)\\member2_canonical_tracks3.csv",
       "id_column_used": "track_id",
       "movement_threshold_pixels": 50.0,
       "toward_camera_image_direction": "down",
       "requested_counting_mode": "auto",
       "selected_counting_method": "movement",
-      "vehicle_ids_per_minute": 70.529,
+      "vehicle_ids_per_minute": 74.307,
       "passage_line_fraction": null,
       "passage_line_y": null,
       "passage_class_refinement": false,
       "class_evidence_window_seconds": null,
-      "canonical_ids": 67,
-      "moving_ids_counted": 51,
-      "parked_or_excluded_ids": 16,
+      "canonical_ids": 71,
+      "moving_ids_counted": 54,
+      "parked_or_excluded_ids": 17,
       "counts_by_class": {
         "Bus": 5,
-        "Car": 38,
+        "Car": 41,
         "Pedestrian": 7,
         "Truck": 1
       },
       "counts_by_direction": {
-        "Away from camera": 41,
-        "Toward camera": 10
+        "Away from camera": 43,
+        "Toward camera": 11
       }
     },
     "Video 4": {
-      "source_csv": "/workspace/scratch/a2b8e7726448/upload/member2_canonical_tracks4.csv",
+      "source_csv": "D:\\MyProfile\\Downloads\\FlowSense_v6_ready_to_run (1)\\member2_canonical_tracks4.csv",
       "id_column_used": "track_id",
       "movement_threshold_pixels": 50.0,
       "toward_camera_image_direction": "down",
       "requested_counting_mode": "auto",
       "selected_counting_method": "movement",
-      "vehicle_ids_per_minute": 107.025,
+      "vehicle_ids_per_minute": 124.718,
       "passage_line_fraction": null,
       "passage_line_y": null,
       "passage_class_refinement": false,
       "class_evidence_window_seconds": null,
-      "canonical_ids": 258,
-      "moving_ids_counted": 236,
-      "parked_or_excluded_ids": 22,
+      "canonical_ids": 299,
+      "moving_ids_counted": 268,
+      "parked_or_excluded_ids": 31,
       "counts_by_class": {
-        "Bus": 4,
-        "Car": 213,
+        "Bus": 8,
+        "Car": 233,
         "Motorcycle": 1,
         "Pedestrian": 4,
-        "Truck": 14
+        "Truck": 22
       },
       "counts_by_direction": {
-        "Away from camera": 5,
-        "Toward camera": 231
+        "Away from camera": 3,
+        "Toward camera": 265
       }
     }
   },
   "combined": {
     "videos_analyzed": 4,
-    "canonical_ids": 539,
-    "moving_ids_counted": 369,
-    "parked_or_excluded_ids": 170,
+    "canonical_ids": 614,
+    "moving_ids_counted": 409,
+    "parked_or_excluded_ids": 205,
     "counts_by_class": {
-      "Bus": 9,
-      "Car": 325,
+      "Bus": 13,
+      "Car": 350,
       "Motorcycle": 3,
       "Pedestrian": 15,
-      "Truck": 17
+      "Truck": 28
     },
     "counts_by_direction": {
       "Away from camera": 54,
       "Cross-traffic": 1,
-      "Toward camera": 314
+      "Toward camera": 354
     }
   },
   "kelvin_comparison_file": "comparison_by_video_class.csv",
   "kelvin_video_comparison_file": "comparison_by_video.csv",
   "kelvin_counts_supplied": true,
-  "kelvin_counts_source": "/workspace/scratch/a2b8e7726448/upload/kelvin_vehicle_counts (1).csv"
+  "kelvin_counts_source": "D:\\MyProfile\\Downloads\\FlowSense_v6_ready_to_run (1)\\kelvin_vehicle_counts.csv"
 }
