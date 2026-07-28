@@ -25,10 +25,15 @@ files.
 - `tracking_data/tracking_data.csv` — Member 1 detections
 - `tracking_data/tracking_data2.csv` — Member 1 detections for video 2
 - `tracking_data/tracking_data3.csv` — Member 1 detections for video 3
+- `tracking_data/tracking_data4.csv` — Member 1 detections for video 4
 - `tracking_data/member2_canonical_tracks.csv` — consolidated Member 2 results
+- `tracking_data/member2_canonical_tracks2.csv` — canonical results for video 2
+- `tracking_data/member2_canonical_tracks3.csv` — canonical results for video 3
+- `tracking_data/member2_canonical_tracks4.csv` — canonical results for video 4
 - `videos/source_traffic.mp4` — original footage needed to reproduce the result
 - `videos/flowsense_tracking2.mp4` — Member 1 video associated with CSV 2
 - `videos/flowsense_tracking3.mp4` — Member 1 video associated with CSV 3
+- `videos/flowsense_tracking4*.mp4` — Member 1 video associated with CSV 4
 - `videos/member2_bytetrack_overlay.mp4` — preprocessed presentation fallback
 
 ## TEST-ONLY files — do not include in the final application bundle

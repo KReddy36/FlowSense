@@ -16,9 +16,11 @@ Required inputs:
 tracking_data/tracking_data.csv
 tracking_data/tracking_data2.csv
 tracking_data/tracking_data3.csv
+tracking_data/tracking_data4.csv
 videos/source_traffic.mp4
 videos/flowsense_tracking2.mp4
 videos/flowsense_tracking3.mp4
+videos/flowsense_tracking4*.mp4
 ```
 
 Generated outputs:
@@ -26,6 +28,9 @@ Generated outputs:
 ```text
 outputs/member2_bytetrack_overlay.mp4
 outputs/member2_canonical_tracks.csv
+outputs/member2_bytetrack_overlay2.mp4
+outputs/member2_canonical_tracks2.csv
+...
 ```
 
 A preprocessed presentation fallback is committed as:
@@ -78,15 +83,17 @@ This processes dataset 1 by default. Select either additional pair with:
 ```powershell
 python track_member1_video.py --dataset 2
 python track_member1_video.py --dataset 3
+python track_member1_video.py --dataset 4
 ```
 
-Process all three sequentially with:
+Process all four sequentially with:
 
 ```powershell
 python track_member1_video.py --dataset all
 ```
 
-Each dataset writes to a different video and canonical CSV under `outputs/`, so
+This processes all four dataset pairs. Each dataset writes to a different video
+and canonical CSV under `outputs/`, so
 the results do not overwrite each other. Custom paths are supported for a
 single selected dataset:
 
@@ -98,6 +105,20 @@ python track_member1_video.py `
     --output outputs/member2_bytetrack_overlay.mp4 `
     --tracks-output outputs/member2_canonical_tracks.csv
 ```
+
+To generate canonical CSV data without decoding or writing an overlaid video:
+
+```powershell
+python track_member1_video.py --dataset 4 --no-video
+python track_member1_video.py --dataset all --no-video
+```
+
+`--no-video` is the faster option for analytics workflows that only need the
+canonical track records.
+
+For dataset 4, the program accepts the canonical `flowsense_tracking4.mp4`
+filename or a single browser-uploaded variant such as
+`flowsense_tracking4 (1) (1) (1).mp4`.
 
 For a short development check:
 
@@ -140,8 +161,12 @@ center_x,center_y,x1,y1,x2,y2
 Member 3 can read this file directly for unique counts, class distributions,
 density, direction, and trajectory statistics. Member 4 can use the annotated
 video as a dashboard input or import the Python modules for live processing.
-Datasets 2 and 3 use the corresponding names
-`member2_canonical_tracks2.csv` and `member2_canonical_tracks3.csv`.
+Datasets 2–4 use the corresponding numbered names, such as
+`member2_canonical_tracks4.csv`.
+
+Precomputed canonical CSVs for all four datasets are also committed under
+`tracking_data/` so the analytics and dashboard components can work without
+rerunning ByteTrack.
 
 ## Identity consolidation
 
