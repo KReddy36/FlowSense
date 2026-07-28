@@ -1,3 +1,5 @@
 numpy==2.5.1
 opencv-python==4.13.0.92
 supervision==0.27.0
+pandas>=2.2,<3
+streamlit>=1.45,<2
