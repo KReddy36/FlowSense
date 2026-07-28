@@ -26,7 +26,7 @@ Video 2,5,10,Toward camera,Car,7
 Video 2,5,10,Toward camera,Motorcycle,0
 Video 2,5,10,Toward camera,Truck,0
 Video 2,10,15,Away from camera,Car,1
-Video 2,10,15,Toward camera,Car,6
+Video 2,10,15,Toward camera,Car,8
 Video 2,10,15,Toward camera,Motorcycle,0
 Video 2,10,15,Toward camera,Truck,0
 Video 2,15,20,Away from camera,Car,0
@@ -34,7 +34,7 @@ Video 2,15,20,Toward camera,Car,6
 Video 2,15,20,Toward camera,Motorcycle,0
 Video 2,15,20,Toward camera,Truck,1
 Video 2,20,25,Away from camera,Car,0
-Video 2,20,25,Toward camera,Car,5
+Video 2,20,25,Toward camera,Car,7
 Video 2,20,25,Toward camera,Motorcycle,0
 Video 2,20,25,Toward camera,Truck,0
 Video 2,25,30,Away from camera,Car,0
@@ -44,13 +44,13 @@ Video 2,25,30,Toward camera,Truck,0
 Video 2,30,35,Away from camera,Car,0
 Video 2,30,35,Toward camera,Car,7
 Video 2,30,35,Toward camera,Motorcycle,0
-Video 2,30,35,Toward camera,Truck,0
+Video 2,30,35,Toward camera,Truck,1
 Video 2,35,40,Away from camera,Car,0
-Video 2,35,40,Toward camera,Car,7
+Video 2,35,40,Toward camera,Car,6
 Video 2,35,40,Toward camera,Motorcycle,0
 Video 2,35,40,Toward camera,Truck,0
 Video 2,40,45,Away from camera,Car,1
-Video 2,40,45,Toward camera,Car,6
+Video 2,40,45,Toward camera,Car,7
 Video 2,40,45,Toward camera,Motorcycle,0
 Video 2,40,45,Toward camera,Truck,0
 Video 2,45,50,Away from camera,Car,0
@@ -58,11 +58,11 @@ Video 2,45,50,Toward camera,Car,4
 Video 2,45,50,Toward camera,Motorcycle,0
 Video 2,45,50,Toward camera,Truck,0
 Video 2,50,55,Away from camera,Car,2
-Video 2,50,55,Toward camera,Car,5
+Video 2,50,55,Toward camera,Car,4
 Video 2,50,55,Toward camera,Motorcycle,0
-Video 2,50,55,Toward camera,Truck,0
+Video 2,50,55,Toward camera,Truck,2
 Video 2,55,60,Away from camera,Car,0
-Video 2,55,60,Toward camera,Car,1
+Video 2,55,60,Toward camera,Car,0
 Video 2,55,60,Toward camera,Motorcycle,1
 Video 2,55,60,Toward camera,Truck,0
 Video 3,0,5,Away from camera,Bus,0
@@ -101,7 +101,7 @@ Video 3,20,25,Toward camera,Bus,0
 Video 3,20,25,Toward camera,Car,0
 Video 3,20,25,Toward camera,Pedestrian,0
 Video 3,25,30,Away from camera,Bus,1
-Video 3,25,30,Away from camera,Car,5
+Video 3,25,30,Away from camera,Car,6
 Video 3,25,30,Away from camera,Pedestrian,1
 Video 3,25,30,Away from camera,Truck,0
 Video 3,25,30,Toward camera,Bus,0
@@ -115,11 +115,11 @@ Video 3,30,35,Toward camera,Bus,0
 Video 3,30,35,Toward camera,Car,2
 Video 3,30,35,Toward camera,Pedestrian,1
 Video 3,35,40,Away from camera,Bus,0
-Video 3,35,40,Away from camera,Car,4
+Video 3,35,40,Away from camera,Car,5
 Video 3,35,40,Away from camera,Pedestrian,0
 Video 3,35,40,Away from camera,Truck,0
 Video 3,35,40,Toward camera,Bus,0
-Video 3,35,40,Toward camera,Car,2
+Video 3,35,40,Toward camera,Car,3
 Video 3,35,40,Toward camera,Pedestrian,1
 Video 3,40,45,Away from camera,Bus,0
 Video 3,40,45,Away from camera,Car,2
@@ -135,199 +135,171 @@ Video 3,45,50,Away from camera,Truck,0
 Video 3,45,50,Toward camera,Bus,1
 Video 3,45,50,Toward camera,Car,0
 Video 3,45,50,Toward camera,Pedestrian,0
-Video 4,0,5,Away from camera,Car,1
 Video 4,0,5,Away from camera,Pedestrian,0
-Video 4,0,5,Toward camera,Bus,1
-Video 4,0,5,Toward camera,Car,12
+Video 4,0,5,Toward camera,Bus,3
+Video 4,0,5,Toward camera,Car,13
 Video 4,0,5,Toward camera,Motorcycle,0
 Video 4,0,5,Toward camera,Pedestrian,0
-Video 4,0,5,Toward camera,Truck,1
-Video 4,5,10,Away from camera,Car,0
+Video 4,0,5,Toward camera,Truck,0
 Video 4,5,10,Away from camera,Pedestrian,0
 Video 4,5,10,Toward camera,Bus,0
 Video 4,5,10,Toward camera,Car,10
 Video 4,5,10,Toward camera,Motorcycle,0
 Video 4,5,10,Toward camera,Pedestrian,0
 Video 4,5,10,Toward camera,Truck,1
-Video 4,10,15,Away from camera,Car,0
 Video 4,10,15,Away from camera,Pedestrian,0
 Video 4,10,15,Toward camera,Bus,0
-Video 4,10,15,Toward camera,Car,5
+Video 4,10,15,Toward camera,Car,7
 Video 4,10,15,Toward camera,Motorcycle,0
 Video 4,10,15,Toward camera,Pedestrian,0
 Video 4,10,15,Toward camera,Truck,1
-Video 4,15,20,Away from camera,Car,0
 Video 4,15,20,Away from camera,Pedestrian,0
 Video 4,15,20,Toward camera,Bus,1
-Video 4,15,20,Toward camera,Car,10
+Video 4,15,20,Toward camera,Car,12
 Video 4,15,20,Toward camera,Motorcycle,1
 Video 4,15,20,Toward camera,Pedestrian,1
 Video 4,15,20,Toward camera,Truck,1
-Video 4,20,25,Away from camera,Car,0
 Video 4,20,25,Away from camera,Pedestrian,0
 Video 4,20,25,Toward camera,Bus,1
 Video 4,20,25,Toward camera,Car,6
 Video 4,20,25,Toward camera,Motorcycle,0
 Video 4,20,25,Toward camera,Pedestrian,0
-Video 4,20,25,Toward camera,Truck,0
-Video 4,25,30,Away from camera,Car,0
+Video 4,20,25,Toward camera,Truck,1
 Video 4,25,30,Away from camera,Pedestrian,0
 Video 4,25,30,Toward camera,Bus,0
-Video 4,25,30,Toward camera,Car,6
+Video 4,25,30,Toward camera,Car,7
 Video 4,25,30,Toward camera,Motorcycle,0
 Video 4,25,30,Toward camera,Pedestrian,0
-Video 4,25,30,Toward camera,Truck,1
-Video 4,30,35,Away from camera,Car,0
+Video 4,25,30,Toward camera,Truck,2
 Video 4,30,35,Away from camera,Pedestrian,0
 Video 4,30,35,Toward camera,Bus,0
-Video 4,30,35,Toward camera,Car,4
+Video 4,30,35,Toward camera,Car,5
 Video 4,30,35,Toward camera,Motorcycle,0
 Video 4,30,35,Toward camera,Pedestrian,0
-Video 4,30,35,Toward camera,Truck,0
-Video 4,35,40,Away from camera,Car,0
+Video 4,30,35,Toward camera,Truck,1
 Video 4,35,40,Away from camera,Pedestrian,0
 Video 4,35,40,Toward camera,Bus,0
 Video 4,35,40,Toward camera,Car,7
 Video 4,35,40,Toward camera,Motorcycle,0
 Video 4,35,40,Toward camera,Pedestrian,0
 Video 4,35,40,Toward camera,Truck,1
-Video 4,40,45,Away from camera,Car,0
 Video 4,40,45,Away from camera,Pedestrian,0
 Video 4,40,45,Toward camera,Bus,0
 Video 4,40,45,Toward camera,Car,4
 Video 4,40,45,Toward camera,Motorcycle,0
 Video 4,40,45,Toward camera,Pedestrian,0
 Video 4,40,45,Toward camera,Truck,1
-Video 4,45,50,Away from camera,Car,0
 Video 4,45,50,Away from camera,Pedestrian,0
 Video 4,45,50,Toward camera,Bus,0
-Video 4,45,50,Toward camera,Car,3
+Video 4,45,50,Toward camera,Car,4
 Video 4,45,50,Toward camera,Motorcycle,0
 Video 4,45,50,Toward camera,Pedestrian,0
 Video 4,45,50,Toward camera,Truck,2
-Video 4,50,55,Away from camera,Car,0
 Video 4,50,55,Away from camera,Pedestrian,0
 Video 4,50,55,Toward camera,Bus,0
 Video 4,50,55,Toward camera,Car,8
 Video 4,50,55,Toward camera,Motorcycle,0
 Video 4,50,55,Toward camera,Pedestrian,0
-Video 4,50,55,Toward camera,Truck,0
-Video 4,55,60,Away from camera,Car,0
+Video 4,50,55,Toward camera,Truck,1
 Video 4,55,60,Away from camera,Pedestrian,0
-Video 4,55,60,Toward camera,Bus,0
+Video 4,55,60,Toward camera,Bus,1
 Video 4,55,60,Toward camera,Car,9
 Video 4,55,60,Toward camera,Motorcycle,0
 Video 4,55,60,Toward camera,Pedestrian,0
 Video 4,55,60,Toward camera,Truck,0
-Video 4,60,65,Away from camera,Car,0
 Video 4,60,65,Away from camera,Pedestrian,0
 Video 4,60,65,Toward camera,Bus,0
 Video 4,60,65,Toward camera,Car,7
 Video 4,60,65,Toward camera,Motorcycle,0
 Video 4,60,65,Toward camera,Pedestrian,0
-Video 4,60,65,Toward camera,Truck,1
-Video 4,65,70,Away from camera,Car,0
+Video 4,60,65,Toward camera,Truck,0
 Video 4,65,70,Away from camera,Pedestrian,0
 Video 4,65,70,Toward camera,Bus,0
 Video 4,65,70,Toward camera,Car,5
 Video 4,65,70,Toward camera,Motorcycle,0
 Video 4,65,70,Toward camera,Pedestrian,0
 Video 4,65,70,Toward camera,Truck,0
-Video 4,70,75,Away from camera,Car,0
 Video 4,70,75,Away from camera,Pedestrian,0
-Video 4,70,75,Toward camera,Bus,0
+Video 4,70,75,Toward camera,Bus,1
 Video 4,70,75,Toward camera,Car,9
 Video 4,70,75,Toward camera,Motorcycle,0
 Video 4,70,75,Toward camera,Pedestrian,0
 Video 4,70,75,Toward camera,Truck,0
-Video 4,75,80,Away from camera,Car,0
 Video 4,75,80,Away from camera,Pedestrian,0
 Video 4,75,80,Toward camera,Bus,0
-Video 4,75,80,Toward camera,Car,15
+Video 4,75,80,Toward camera,Car,17
 Video 4,75,80,Toward camera,Motorcycle,0
 Video 4,75,80,Toward camera,Pedestrian,0
-Video 4,75,80,Toward camera,Truck,1
-Video 4,80,85,Away from camera,Car,0
+Video 4,75,80,Toward camera,Truck,2
 Video 4,80,85,Away from camera,Pedestrian,0
 Video 4,80,85,Toward camera,Bus,0
 Video 4,80,85,Toward camera,Car,6
 Video 4,80,85,Toward camera,Motorcycle,0
 Video 4,80,85,Toward camera,Pedestrian,0
-Video 4,80,85,Toward camera,Truck,0
-Video 4,85,90,Away from camera,Car,0
+Video 4,80,85,Toward camera,Truck,1
 Video 4,85,90,Away from camera,Pedestrian,0
 Video 4,85,90,Toward camera,Bus,1
 Video 4,85,90,Toward camera,Car,7
 Video 4,85,90,Toward camera,Motorcycle,0
 Video 4,85,90,Toward camera,Pedestrian,0
 Video 4,85,90,Toward camera,Truck,0
-Video 4,90,95,Away from camera,Car,0
 Video 4,90,95,Away from camera,Pedestrian,0
 Video 4,90,95,Toward camera,Bus,0
-Video 4,90,95,Toward camera,Car,11
+Video 4,90,95,Toward camera,Car,12
 Video 4,90,95,Toward camera,Motorcycle,0
 Video 4,90,95,Toward camera,Pedestrian,0
 Video 4,90,95,Toward camera,Truck,0
-Video 4,95,100,Away from camera,Car,0
 Video 4,95,100,Away from camera,Pedestrian,0
 Video 4,95,100,Toward camera,Bus,0
 Video 4,95,100,Toward camera,Car,8
 Video 4,95,100,Toward camera,Motorcycle,0
 Video 4,95,100,Toward camera,Pedestrian,0
-Video 4,95,100,Toward camera,Truck,1
-Video 4,100,105,Away from camera,Car,0
+Video 4,95,100,Toward camera,Truck,2
 Video 4,100,105,Away from camera,Pedestrian,0
 Video 4,100,105,Toward camera,Bus,0
-Video 4,100,105,Toward camera,Car,7
+Video 4,100,105,Toward camera,Car,9
 Video 4,100,105,Toward camera,Motorcycle,0
 Video 4,100,105,Toward camera,Pedestrian,0
-Video 4,100,105,Toward camera,Truck,0
-Video 4,105,110,Away from camera,Car,1
+Video 4,100,105,Toward camera,Truck,1
 Video 4,105,110,Away from camera,Pedestrian,1
 Video 4,105,110,Toward camera,Bus,0
-Video 4,105,110,Toward camera,Car,10
+Video 4,105,110,Toward camera,Car,12
 Video 4,105,110,Toward camera,Motorcycle,0
 Video 4,105,110,Toward camera,Pedestrian,0
 Video 4,105,110,Toward camera,Truck,0
-Video 4,110,115,Away from camera,Car,0
 Video 4,110,115,Away from camera,Pedestrian,2
 Video 4,110,115,Toward camera,Bus,0
-Video 4,110,115,Toward camera,Car,7
+Video 4,110,115,Toward camera,Car,10
 Video 4,110,115,Toward camera,Motorcycle,0
 Video 4,110,115,Toward camera,Pedestrian,0
 Video 4,110,115,Toward camera,Truck,0
-Video 4,115,120,Away from camera,Car,0
 Video 4,115,120,Away from camera,Pedestrian,0
 Video 4,115,120,Toward camera,Bus,0
-Video 4,115,120,Toward camera,Car,11
+Video 4,115,120,Toward camera,Car,12
 Video 4,115,120,Toward camera,Motorcycle,0
 Video 4,115,120,Toward camera,Pedestrian,0
 Video 4,115,120,Toward camera,Truck,0
-Video 4,120,125,Away from camera,Car,0
 Video 4,120,125,Away from camera,Pedestrian,0
 Video 4,120,125,Toward camera,Bus,0
-Video 4,120,125,Toward camera,Car,8
+Video 4,120,125,Toward camera,Car,10
 Video 4,120,125,Toward camera,Motorcycle,0
 Video 4,120,125,Toward camera,Pedestrian,0
-Video 4,120,125,Toward camera,Truck,0
-Video 4,125,130,Away from camera,Car,0
+Video 4,120,125,Toward camera,Truck,2
 Video 4,125,130,Away from camera,Pedestrian,0
 Video 4,125,130,Toward camera,Bus,0
-Video 4,125,130,Toward camera,Car,10
+Video 4,125,130,Toward camera,Car,9
 Video 4,125,130,Toward camera,Motorcycle,0
 Video 4,125,130,Toward camera,Pedestrian,0
 Video 4,125,130,Toward camera,Truck,0
-Video 4,130,135,Away from camera,Car,0
 Video 4,130,135,Away from camera,Pedestrian,0
 Video 4,130,135,Toward camera,Bus,0
-Video 4,130,135,Toward camera,Car,5
+Video 4,130,135,Toward camera,Car,6
 Video 4,130,135,Toward camera,Motorcycle,0
 Video 4,130,135,Toward camera,Pedestrian,0
 Video 4,130,135,Toward camera,Truck,0
-Video 4,135,140,Away from camera,Car,0
 Video 4,135,140,Away from camera,Pedestrian,0
 Video 4,135,140,Toward camera,Bus,0
-Video 4,135,140,Toward camera,Car,1
+Video 4,135,140,Toward camera,Car,2
 Video 4,135,140,Toward camera,Motorcycle,0
 Video 4,135,140,Toward camera,Pedestrian,0
 Video 4,135,140,Toward camera,Truck,2

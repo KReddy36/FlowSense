@@ -3,20 +3,19 @@ Video 1,Away from camera,Pedestrian,3
 Video 1,Cross-traffic,Pedestrian,1
 Video 1,Toward camera,Car,6
 Video 2,Away from camera,Car,5
-Video 2,Toward camera,Car,63
+Video 2,Toward camera,Car,65
 Video 2,Toward camera,Motorcycle,2
-Video 2,Toward camera,Truck,2
+Video 2,Toward camera,Truck,5
 Video 3,Away from camera,Bus,3
-Video 3,Away from camera,Car,32
+Video 3,Away from camera,Car,34
 Video 3,Away from camera,Pedestrian,5
 Video 3,Away from camera,Truck,1
 Video 3,Toward camera,Bus,2
-Video 3,Toward camera,Car,6
+Video 3,Toward camera,Car,7
 Video 3,Toward camera,Pedestrian,2
-Video 4,Away from camera,Car,2
 Video 4,Away from camera,Pedestrian,3
-Video 4,Toward camera,Bus,4
-Video 4,Toward camera,Car,211
+Video 4,Toward camera,Bus,8
+Video 4,Toward camera,Car,233
 Video 4,Toward camera,Motorcycle,1
 Video 4,Toward camera,Pedestrian,1
-Video 4,Toward camera,Truck,14
+Video 4,Toward camera,Truck,22
