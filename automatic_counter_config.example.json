@@ -1,0 +1,24 @@
+{
+  "videos": {
+    "member2_canonical_tracks_video1.csv": {
+      "video_label": "Video 1",
+      "toward_camera": "down",
+      "movement_threshold_pixels": 50
+    },
+    "member2_canonical_tracks_video2.csv": {
+      "video_label": "Video 2",
+      "toward_camera": "down",
+      "movement_threshold_pixels": 50
+    },
+    "member2_canonical_tracks_video3.csv": {
+      "video_label": "Video 3",
+      "toward_camera": "down",
+      "movement_threshold_pixels": 50
+    },
+    "member2_canonical_tracks_video4.csv": {
+      "video_label": "Video 4",
+      "toward_camera": "down",
+      "movement_threshold_pixels": 50
+    }
+  }
+}
