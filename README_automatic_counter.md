@@ -24,7 +24,7 @@ This prevents Video 2's short track fragments from being counted as separate
 vehicles.
 
 For a passage-counted video, nearby downstream non-car fragments can refine a
-crossing's class without adding another vehicle. This preserves the 72-vehicle
+crossing's class without adding another vehicle. This preserves the 77-vehicle
 Video 2 total while recovering detected truck and motorcycle evidence.
 
 ## Simplest way to run it

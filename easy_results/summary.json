@@ -17,7 +17,9 @@
   },
   "videos": {
     "Video 1": {
-      "source_csv": "D:\\MyProfile\\Downloads\\FlowSense_v6_ready_to_run (1)\\member2_canonical_tracks.csv",
+      "source_csv": "tracking_data/member2_canonical_tracks.csv",
+      "source_display_name": "member2_canonical_tracks.csv",
+      "standalone_report": false,
       "id_column_used": "track_id",
       "movement_threshold_pixels": 50.0,
       "toward_camera_image_direction": "down",
@@ -42,7 +44,9 @@
       }
     },
     "Video 2": {
-      "source_csv": "D:\\MyProfile\\Downloads\\FlowSense_v6_ready_to_run (1)\\member2_canonical_tracks2.csv",
+      "source_csv": "tracking_data/member2_canonical_tracks2.csv",
+      "source_display_name": "member2_canonical_tracks2.csv",
+      "standalone_report": false,
       "id_column_used": "track_id",
       "movement_threshold_pixels": 50.0,
       "toward_camera_image_direction": "down",
@@ -67,7 +71,9 @@
       }
     },
     "Video 3": {
-      "source_csv": "D:\\MyProfile\\Downloads\\FlowSense_v6_ready_to_run (1)\\member2_canonical_tracks3.csv",
+      "source_csv": "tracking_data/member2_canonical_tracks3.csv",
+      "source_display_name": "member2_canonical_tracks3.csv",
+      "standalone_report": false,
       "id_column_used": "track_id",
       "movement_threshold_pixels": 50.0,
       "toward_camera_image_direction": "down",
@@ -93,7 +99,9 @@
       }
     },
     "Video 4": {
-      "source_csv": "D:\\MyProfile\\Downloads\\FlowSense_v6_ready_to_run (1)\\member2_canonical_tracks4.csv",
+      "source_csv": "tracking_data/member2_canonical_tracks4.csv",
+      "source_display_name": "member2_canonical_tracks4.csv",
+      "standalone_report": false,
       "id_column_used": "track_id",
       "movement_threshold_pixels": 50.0,
       "toward_camera_image_direction": "down",
@@ -141,5 +149,5 @@
   "kelvin_comparison_file": "comparison_by_video_class.csv",
   "kelvin_video_comparison_file": "comparison_by_video.csv",
   "kelvin_counts_supplied": true,
-  "kelvin_counts_source": "D:\\MyProfile\\Downloads\\FlowSense_v6_ready_to_run (1)\\kelvin_vehicle_counts.csv"
+  "kelvin_counts_source": "kelvin_vehicle_counts.csv"
 }

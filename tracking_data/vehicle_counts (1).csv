@@ -1,9 +1,0 @@
-Video number,Direction of the road,Cars crossing,Trucks,Buses,Motorcycles,Bicycles,Pedestrians,Stationary vehicles excluded,Uncertain cases
-Video 1,up,6,2,0,0,0,"3 (only one identified)",2,
-Video 2,down,4,2,,3,0,0,0,
-Video 2,up,62,1,0,0,0,0,0,
-Video 3,up,33,1,3,0,3,5,0,people riding
-Video 3,down,8,0,2,0,1,0,0,1 pushing bicycle but not riding
-Video 4,left,24,2,1,0,0,0,0,
-Video 4,middle,51,3,1,0,0,0,0,
-Video 4,right,137,15,2,3,0,0,1,

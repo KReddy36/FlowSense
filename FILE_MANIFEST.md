@@ -1,82 +1,123 @@
 # FlowSense file manifest
 
-This manifest separates production files from development-only verification
-files.
+This manifest distinguishes production code, reproducibility artifacts, and
+development-only verification files.
 
-## Production files — include in the final project
+## Production application
 
-### Unified application
+### Entry points
 
-- `run_flowsense.py` — one-command command-line entry point
-- `flowsense/pipeline.py` — video decoding, tracking/prediction orchestration,
-  temporary artifact management, and final artifact publishing
-- `flowsense/yolo_detector.py` — in-memory Ultralytics YOLO adapter
-- `automatic_counter.py` — traffic counting and standalone HTML report
-- `requirements.txt`
+- `run_flowsense.py` — one-command video-to-results pipeline
+- `Dashboard.py` — Streamlit dashboard
+- `automatic_counter.py` — traffic counting and HTML report generator
+- `evaluate_motion_prediction.py` — prediction accuracy and baseline evaluator
 
-### Member 2 source code
+### Core package
 
-- `track_member1_video.py`
 - `flowsense/__init__.py`
-- `flowsense/csv_detections.py`
-- `flowsense/tracking/motion_prediction.py` — bounded trajectory histories,
-  smoothed velocity, missed-detection handling, and position prediction
+- `flowsense/pipeline.py` — unified detection-to-report orchestration
+- `flowsense/yolo_detector.py` — in-memory Ultralytics YOLO adapter
+- `flowsense/csv_detections.py` — legacy detection CSV loader
+- `flowsense/prediction_evaluation.py` — measured future-position evaluation
 - `flowsense/tracking/__init__.py`
 - `flowsense/tracking/bytetrack_tracker.py`
 - `flowsense/tracking/identity_consolidator.py`
+- `flowsense/tracking/motion_prediction.py`
 - `flowsense/tracking/render.py`
 - `flowsense/tracking/schemas.py`
 
-### Reproducibility and shared artifacts
+### Configuration and documentation
 
 - `requirements.txt`
 - `.gitignore`
 - `README.md`
+- `README_automatic_counter.md`
+- `PREDICTION_EVALUATION.md`
+- `automatic_counter_config.example.json`
 - `FILE_MANIFEST.md`
-- `tracking_data/tracking_data.csv` — Member 1 detections
-- `tracking_data/tracking_data2.csv` — Member 1 detections for video 2
-- `tracking_data/tracking_data3.csv` — Member 1 detections for video 3
-- `tracking_data/tracking_data4.csv` — Member 1 detections for video 4
-- `tracking_data/member2_canonical_tracks.csv` — consolidated Member 2 results
-- `tracking_data/member2_canonical_tracks2.csv` — canonical results for video 2
-- `tracking_data/member2_canonical_tracks3.csv` — canonical results for video 3
-- `tracking_data/member2_canonical_tracks4.csv` — canonical results for video 4
+- `LICENSE`
 
-Generated at runtime under `outputs/`:
+## Committed result snapshot
 
-- `member2_motion_predictions.csv` (and suffixed datasets 2–4) — active-track
-  motion and prediction history for statistics/dashboard use
-- `videos/source_traffic.mp4` — original footage needed to reproduce the result
-- `videos/flowsense_tracking2.mp4` — Member 1 video associated with CSV 2
-- `videos/flowsense_tracking3.mp4` — Member 1 video associated with CSV 3
-- `videos/flowsense_tracking4*.mp4` — Member 1 video associated with CSV 4
-- `videos/member2_bytetrack_overlay.mp4` — preprocessed presentation fallback
+The `easy_results/` directory is a reproducible snapshot used by the dashboard
+and presentation:
 
-## TEST-ONLY files — do not include in the final application bundle
+- `easy_results/FlowSense_report.html`
+- `easy_results/READ_ME_FIRST.csv`
+- `easy_results/automatic_counts.csv`
+- `easy_results/automatic_counts_detailed.csv`
+- `easy_results/comparison_by_video.csv`
+- `easy_results/comparison_by_video_class.csv`
+- `easy_results/object_movement_audit.csv`
+- `easy_results/prediction_accuracy.csv`
+- `easy_results/summary.json`
+- `easy_results/traffic_volume_intervals.csv`
+- `easy_results/video_file_map.csv`
+
+All committed result paths are repository-relative and contain no personal
+computer directories.
+
+## Reproducibility inputs
+
+### Detection and canonical tracking data
+
+- `tracking_data/tracking_data.csv`
+- `tracking_data/tracking_data2.csv`
+- `tracking_data/tracking_data3.csv`
+- `tracking_data/tracking_data4.csv`
+- `tracking_data/member2_canonical_tracks.csv`
+- `tracking_data/member2_canonical_tracks2.csv`
+- `tracking_data/member2_canonical_tracks3.csv`
+- `tracking_data/member2_canonical_tracks4.csv`
+- `tracking_data/README.md`
+
+### Manual observations and templates
+
+- `kelvin_vehicle_counts.csv` — retained manual count reference
+- `kelvin_comparison_template.csv`
+
+### Videos
+
+- `videos/source_traffic.mp4`
+- `videos/flowsense_tracking.mp4`
+- `videos/flowsense_tracking2.mp4`
+- `videos/flowsense_tracking3.mp4`
+- `videos/flowsense_tracking4*.mp4`
+- `videos/member2_bytetrack_overlay.mp4`
+- `videos/README.md`
+
+### Legacy reproduction tools
+
+- `track_member1_video.py` — CSV-based Member 2 workflow
+- `flowsense_yolo_tracking.ipynb` — original Member 1 notebook
+
+## TEST-ONLY files
+
+These remain in GitHub for regression testing but are not required in a final
+runtime-only submission:
 
 - `demo_day1.py`
 - `flowsense/tracking/verification.py`
-- `tests/README.md`
+- `test_automatic_counter.py`
 - `tests/__init__.py`
-- `tests/test_csv_detections.py`
-- `tests/test_day1_tracking.py`
-- `tests/test_dataset_configs.py`
-- `tests/test_motion_prediction.py`
-- `tests/test_identity_consolidator.py`
-- `tests/test_yolo_detector.py`
-- `tests/test_end_to_end_pipeline.py`
+- `tests/README.md`
 - `tests/fixtures/member1_sample.csv`
+- `tests/test_csv_detections.py`
+- `tests/test_dataset_configs.py`
+- `tests/test_day1_tracking.py`
+- `tests/test_end_to_end_pipeline.py`
+- `tests/test_identity_consolidator.py`
+- `tests/test_motion_prediction.py`
+- `tests/test_prediction_evaluation.py`
+- `tests/test_yolo_detector.py`
+- `.github/workflows/tests.yml` — automated test workflow
 
-Keep these test-only files in GitHub until integration and final regression
-testing are complete. They can be omitted from a deployment or presentation
-submission if only runtime files are requested.
-
-## Never upload
+## Generated locally — never upload
 
 - `.venv/`, `.venv-old/`, or `.deps/`
-- `__pycache__/` or `*.pyc`
+- `__pycache__/`, `*.pyc`, `.pytest_cache/`, or `.coverage`
 - `.vscode/`
-- `fromMember1/` (its relevant files are stored in repository-native folders)
-- `outputs/` previews and local environment checks
+- `fromMember1/`
+- `outputs/` previews and diagnostic CSVs
 - `results/` generated final videos and reports
 - downloaded `*.pt` model weights

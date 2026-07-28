@@ -1,5 +1,5 @@
 Video label,Source filename,Full source path
-Video 1,member2_canonical_tracks.csv,D:\MyProfile\Downloads\FlowSense_v6_ready_to_run (1)\member2_canonical_tracks.csv
-Video 2,member2_canonical_tracks2.csv,D:\MyProfile\Downloads\FlowSense_v6_ready_to_run (1)\member2_canonical_tracks2.csv
-Video 3,member2_canonical_tracks3.csv,D:\MyProfile\Downloads\FlowSense_v6_ready_to_run (1)\member2_canonical_tracks3.csv
-Video 4,member2_canonical_tracks4.csv,D:\MyProfile\Downloads\FlowSense_v6_ready_to_run (1)\member2_canonical_tracks4.csv
+Video 1,member2_canonical_tracks.csv,tracking_data/member2_canonical_tracks.csv
+Video 2,member2_canonical_tracks2.csv,tracking_data/member2_canonical_tracks2.csv
+Video 3,member2_canonical_tracks3.csv,tracking_data/member2_canonical_tracks3.csv
+Video 4,member2_canonical_tracks4.csv,tracking_data/member2_canonical_tracks4.csv
