@@ -12,6 +12,7 @@ input video
   -> YOLO road-user detection
   -> ByteTrack and identity consolidation
   -> trajectory smoothing and short-term prediction
+  -> retrospective prediction-accuracy scoring
   -> automatic traffic counting
   -> annotated video and standalone HTML report
 ```
@@ -72,6 +73,12 @@ removes prediction state after a configurable inactivity timeout.
 
 Observed trajectories are solid in the annotated video. Short-term linear
 predictions are dashed and end in an outlined marker.
+
+Each one-command run also scores its eligible predictions after the video has
+finished processing. The HTML report's prediction accuracy is the percentage
+of forecasts that are closer to the later observed track position than the
+stationary ("vehicle stays in place") baseline. If a short clip has too few
+eligible future observations, the report displays `N/A`.
 
 ### Measured prediction accuracy
 

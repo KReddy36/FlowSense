@@ -1042,6 +1042,32 @@ def write_html_report(
                 f"{float(settings['movement_threshold_pixels']):g} px"
             )
         )
+        prediction_metric = ""
+        prediction_note = ""
+        if bool(settings.get("prediction_evaluation_enabled")):
+            accuracy = settings.get("prediction_accuracy_percent")
+            samples = int(settings.get("prediction_accuracy_samples", 0))
+            horizon = int(settings.get("prediction_horizon_frames", 0))
+            if accuracy is None:
+                accuracy_display = "N/A"
+                prediction_note = (
+                    "<p class=\"prediction-note\">There were not enough "
+                    f"eligible {horizon}-frame forecasts to calculate "
+                    "prediction accuracy.</p>"
+                )
+            else:
+                accuracy_display = f"{float(accuracy):.1f}%"
+                prediction_note = (
+                    "<p class=\"prediction-note\">Prediction accuracy is the "
+                    f"share of {samples:,} eligible {horizon}-frame forecasts "
+                    "that were closer to the later observed position than "
+                    "the stationary baseline.</p>"
+                )
+            prediction_metric = (
+                '<div class="metric primary">'
+                f"<strong>{accuracy_display}</strong>"
+                "<span>Prediction accuracy</span></div>"
+            )
 
         direction_phrases = {
             "Toward camera": "toward the camera",
@@ -1099,8 +1125,10 @@ def write_html_report(
                 <div class="metric primary"><strong>{len(moving)}</strong><span>Moving objects counted</span></div>
                 <div class="metric primary"><strong>{sum(class_counts[name] for name in VEHICLE_CLASSES)}</strong><span>Vehicles counted</span></div>
                 <div class="metric"><strong>{class_counts['Pedestrian']}</strong><span>Pedestrians counted</span></div>
+                {prediction_metric}
                 <div class="metric"><strong>{len(video_results) - len(moving)}</strong><span>Parked or excluded</span></div>
               </div>
+              {prediction_note}
               <p class="interpretation"><strong>Plain-English result:</strong>
                 {html.escape(plain_english)}
               </p>
@@ -1158,6 +1186,7 @@ def write_html_report(
     .metric.primary {{ color: #1e40af; background: var(--pale); border-color: #bfdbfe; }}
     .metric strong {{ display: block; font-size: 34px; line-height: 1; margin-bottom: 10px; }}
     .metric span {{ color: var(--muted); font-weight: 650; }}
+    .prediction-note {{ margin: -4px 0 18px; color: var(--muted); font-size: 14px; }}
     .section-heading {{ display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; }}
     .source-file {{ margin: -6px 0 10px; color: var(--muted); font-size: 13px; }}
     h2, h3 {{ margin: 4px 0 12px; }}
@@ -1670,6 +1699,18 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         }
     source_display_name = getattr(args, "source_display_name", None)
     standalone_report = bool(getattr(args, "standalone_report", False))
+    prediction_evaluation_enabled = bool(
+        getattr(args, "prediction_evaluation_enabled", False)
+    )
+    prediction_accuracy_percent = getattr(
+        args, "prediction_accuracy_percent", None
+    )
+    prediction_accuracy_samples = int(
+        getattr(args, "prediction_accuracy_samples", 0)
+    )
+    prediction_horizon_frames = int(
+        getattr(args, "prediction_horizon_frames", 0)
+    )
     all_results: list[TrackResult] = []
     videos: list[str] = []
     video_settings: dict[str, dict[str, object]] = {}
@@ -1746,6 +1787,10 @@ def run(args: argparse.Namespace) -> dict[str, object]:
                 else path.name
             ),
             "standalone_report": standalone_report,
+            "prediction_evaluation_enabled": prediction_evaluation_enabled,
+            "prediction_accuracy_percent": prediction_accuracy_percent,
+            "prediction_accuracy_samples": prediction_accuracy_samples,
+            "prediction_horizon_frames": prediction_horizon_frames,
             "id_column_used": id_column,
             "movement_threshold_pixels": threshold,
             "toward_camera_image_direction": toward,
@@ -1988,6 +2033,9 @@ def run_single_video_report(
     movement_threshold_pixels: float = 50.0,
     toward_camera: str = "down",
     counting_mode: str = "auto",
+    prediction_accuracy_percent: float | None = None,
+    prediction_accuracy_samples: int = 0,
+    prediction_horizon_frames: int = 15,
 ) -> dict[str, object]:
     """Generate Member 3's report for one pipeline-produced tracking file."""
     arguments = argparse.Namespace(
@@ -2010,6 +2058,10 @@ def run_single_video_report(
         video_label=video_label,
         source_display_name=Path(source_video).name,
         standalone_report=True,
+        prediction_evaluation_enabled=True,
+        prediction_accuracy_percent=prediction_accuracy_percent,
+        prediction_accuracy_samples=prediction_accuracy_samples,
+        prediction_horizon_frames=prediction_horizon_frames,
     )
     return run(arguments)
 

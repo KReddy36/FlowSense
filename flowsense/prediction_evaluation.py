@@ -44,6 +44,8 @@ def evaluate_tracking_csv(
         for frame_rows in rows.values()
         for row in frame_rows
     }
+    if len(timestamps_by_frame) < 2:
+        return []
     fps = _infer_fps(timestamps_by_frame)
     predictor = MotionPredictor(
         fps=fps,

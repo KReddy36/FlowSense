@@ -14,6 +14,7 @@ import numpy as np
 
 from automatic_counter import run_single_video_report
 
+from .prediction_evaluation import evaluate_tracking_csv, summarize_errors
 from .tracking import ByteTrackTracker, IdentityConsolidator, MotionPredictor
 from .tracking.render import render_motion_paths, render_tracking_ids
 from .tracking.schemas import Detection
@@ -105,6 +106,8 @@ class PipelineResult:
     suppressed_duplicate_instances: int
     counts_by_class: dict[str, int]
     counts_by_direction: dict[str, int]
+    prediction_accuracy_percent: float | None
+    prediction_accuracy_samples: int
     intermediate_dir: Path | None
 
 
@@ -170,6 +173,27 @@ def run_pipeline(
                 "Try a lower --confidence value or a different video."
             )
 
+        prediction_errors = evaluate_tracking_csv(
+            canonical_tracks,
+            dataset=input_video.stem,
+            history_points=config.history_points,
+            velocity_window=config.velocity_window,
+            prediction_horizon_frames=config.prediction_horizon_frames,
+            inactive_timeout_frames=config.inactive_timeout_frames,
+        )
+        prediction_accuracy_percent: float | None = None
+        if prediction_errors:
+            prediction_summary = summarize_errors(
+                prediction_errors,
+                dataset=input_video.stem,
+                prediction_horizon_frames=(
+                    config.prediction_horizon_frames
+                ),
+            )
+            prediction_accuracy_percent = float(
+                prediction_summary["Prediction win rate (%)"]
+            )
+
         count_summary = run_single_video_report(
             canonical_tracks,
             counter_outputs,
@@ -178,6 +202,9 @@ def run_pipeline(
             movement_threshold_pixels=config.movement_threshold_pixels,
             toward_camera=config.toward_camera,
             counting_mode=config.counting_mode,
+            prediction_accuracy_percent=prediction_accuracy_percent,
+            prediction_accuracy_samples=len(prediction_errors),
+            prediction_horizon_frames=config.prediction_horizon_frames,
         )
         staged_report = counter_outputs / "FlowSense_report.html"
         if not staged_report.is_file():
@@ -209,6 +236,8 @@ def run_pipeline(
                     combined["counts_by_direction"]
                 ).items()
             },
+            prediction_accuracy_percent=prediction_accuracy_percent,
+            prediction_accuracy_samples=len(prediction_errors),
             intermediate_dir=intermediate_dir,
         )
 

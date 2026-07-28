@@ -78,11 +78,44 @@ class EndToEndPipelineTests(unittest.TestCase):
             self.assertIn("FlowSense Traffic Results", report)
             self.assertEqual(result.processed_frames, 8)
             self.assertGreater(result.unique_track_ids, 0)
+            self.assertIsNone(result.prediction_accuracy_percent)
+            self.assertEqual(result.prediction_accuracy_samples, 0)
+            self.assertIn("Prediction accuracy", report)
+            self.assertIn("N/A", report)
             self.assertIsNone(result.intermediate_dir)
             self.assertEqual(
                 sorted(path.name for path in output_dir.iterdir()),
                 ["intersection_flowsense.mp4", "intersection_report.html"],
             )
+
+    def test_report_includes_prediction_accuracy_percentage(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            input_video = root / "intersection.mp4"
+            output_dir = root / "results"
+            _write_test_video(input_video, frame_count=30)
+
+            result = run_pipeline(
+                PipelineConfig(
+                    input_video=input_video,
+                    output_dir=output_dir,
+                    movement_threshold_pixels=1.0,
+                    velocity_window=2,
+                    prediction_horizon_frames=3,
+                ),
+                detector=_MovingCarDetector(),
+            )
+
+            self.assertIsNotNone(result.prediction_accuracy_percent)
+            assert result.prediction_accuracy_percent is not None
+            self.assertGreater(result.prediction_accuracy_percent, 50.0)
+            self.assertGreater(result.prediction_accuracy_samples, 0)
+            report = result.output_report.read_text(encoding="utf-8")
+            self.assertIn(
+                f"{result.prediction_accuracy_percent:.1f}%",
+                report,
+            )
+            self.assertIn("stationary baseline", report)
 
     def test_debug_option_retains_internal_csvs(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
