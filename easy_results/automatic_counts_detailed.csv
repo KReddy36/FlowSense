@@ -1,0 +1,20 @@
+Video,Direction,Class,Automatic count
+Video 1,Away from camera,Pedestrian,3
+Video 1,Cross-traffic,Pedestrian,1
+Video 1,Toward camera,Car,6
+Video 2,Away from camera,Car,5
+Video 2,Toward camera,Car,67
+Video 3,Away from camera,Bus,3
+Video 3,Away from camera,Car,32
+Video 3,Away from camera,Pedestrian,5
+Video 3,Away from camera,Truck,1
+Video 3,Toward camera,Bus,2
+Video 3,Toward camera,Car,6
+Video 3,Toward camera,Pedestrian,2
+Video 4,Away from camera,Car,2
+Video 4,Away from camera,Pedestrian,3
+Video 4,Toward camera,Bus,4
+Video 4,Toward camera,Car,211
+Video 4,Toward camera,Motorcycle,1
+Video 4,Toward camera,Pedestrian,1
+Video 4,Toward camera,Truck,14

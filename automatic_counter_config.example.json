@@ -1,0 +1,32 @@
+{
+  "videos": {
+    "Video 1": {
+      "video_label": "Video 1",
+      "toward_camera": "down",
+      "movement_threshold_pixels": 50,
+      "counting_mode": "auto",
+      "passage_line_fraction": 0.4
+    },
+    "Video 2": {
+      "video_label": "Video 2",
+      "toward_camera": "down",
+      "movement_threshold_pixels": 50,
+      "counting_mode": "auto",
+      "passage_line_fraction": 0.4
+    },
+    "Video 3": {
+      "video_label": "Video 3",
+      "toward_camera": "down",
+      "movement_threshold_pixels": 50,
+      "counting_mode": "auto",
+      "passage_line_fraction": 0.4
+    },
+    "Video 4": {
+      "video_label": "Video 4",
+      "toward_camera": "down",
+      "movement_threshold_pixels": 50,
+      "counting_mode": "auto",
+      "passage_line_fraction": 0.4
+    }
+  }
+}

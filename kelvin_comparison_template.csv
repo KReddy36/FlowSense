@@ -1,0 +1,4 @@
+Video,Dataset role,Direction,Class,Kelvin count,Automatic count,Error (automatic - Kelvin),Absolute error,Percent error
+member2_canonical_tracks,Development,Away from camera,Pedestrian,,3,,,
+member2_canonical_tracks,Development,Cross-traffic,Pedestrian,,1,,,
+member2_canonical_tracks,Development,Toward camera,Car,,6,,,
