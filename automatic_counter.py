@@ -24,7 +24,7 @@ import re
 import statistics
 from collections import Counter, defaultdict
 from dataclasses import dataclass, replace
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Iterable
 
 
@@ -821,7 +821,11 @@ def write_csv(
 
 def portable_path(path: str | Path) -> str:
     """Return a reproducible relative path without exposing a home directory."""
-    candidate = Path(path)
+    raw_path = str(path)
+    candidate = Path(raw_path)
+    windows_candidate = PureWindowsPath(raw_path)
+    if windows_candidate.is_absolute() and not candidate.is_absolute():
+        return windows_candidate.name
     try:
         return candidate.resolve().relative_to(Path.cwd().resolve()).as_posix()
     except ValueError:
