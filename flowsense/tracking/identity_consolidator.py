@@ -63,13 +63,18 @@ class IdentityConsolidator:
     def __init__(
         self,
         *,
-        duplicate_iou_threshold: float = 0.72,
+        duplicate_iou_threshold: float = 0.85,
+        duplicate_center_distance_ratio: float = 0.20,
         reidentification_iou_threshold: float = 0.20,
         reidentification_distance_ratio: float = 0.75,
         maximum_reidentification_gap: int = 15,
     ) -> None:
         if not 0.0 <= duplicate_iou_threshold <= 1.0:
             raise ValueError("duplicate_iou_threshold must be between 0 and 1")
+        if duplicate_center_distance_ratio < 0:
+            raise ValueError(
+                "duplicate_center_distance_ratio cannot be negative"
+            )
         if not 0.0 <= reidentification_iou_threshold <= 1.0:
             raise ValueError(
                 "reidentification_iou_threshold must be between 0 and 1"
@@ -80,6 +85,7 @@ class IdentityConsolidator:
             raise ValueError("maximum_reidentification_gap must be positive")
 
         self.duplicate_iou_threshold = duplicate_iou_threshold
+        self.duplicate_center_distance_ratio = duplicate_center_distance_ratio
         self.reidentification_iou_threshold = reidentification_iou_threshold
         self.reidentification_distance_ratio = reidentification_distance_ratio
         self.maximum_reidentification_gap = maximum_reidentification_gap
@@ -119,8 +125,12 @@ class IdentityConsolidator:
             }
             if mapped:
                 canonical_id = min(mapped)
-                for other_id in mapped:
-                    canonical_id = self._merge_identities(canonical_id, other_id)
+                # If a prior reidentification mapped two different raw tracks
+                # onto one identity, they can later appear together as
+                # spatially separate clusters. Split the lower-confidence
+                # cluster instead of alternating which vehicle is displayed.
+                if canonical_id in assigned_this_frame:
+                    canonical_id = self._create_identity(representative)
             else:
                 match = self._find_recent_identity(
                     representative,
@@ -212,6 +222,12 @@ class IdentityConsolidator:
         self, tracks: list[TrackedDetection]
     ) -> list[list[TrackedDetection]]:
         parents = list(range(len(tracks)))
+        canonical_ids: list[set[int]] = []
+        for track in tracks:
+            mapped_id = self._raw_to_canonical.get(track.track_id)
+            canonical_ids.append(
+                {self._resolve(mapped_id)} if mapped_id is not None else set()
+            )
 
         def find(index: int) -> int:
             while parents[index] != index:
@@ -222,15 +238,39 @@ class IdentityConsolidator:
         def union(first: int, second: int) -> None:
             first_root = find(first)
             second_root = find(second)
-            if first_root != second_root:
-                parents[second_root] = first_root
+            if first_root == second_root:
+                return
+
+            # Two established tracks may overlap while passing, queuing, or
+            # crossing in perspective. Never permanently merge their
+            # canonical identities solely because their boxes overlap.
+            combined_ids = canonical_ids[first_root] | canonical_ids[second_root]
+            if len(combined_ids) > 1:
+                return
+            parents[second_root] = first_root
+            canonical_ids[first_root] = combined_ids
 
         for first in range(len(tracks)):
             for second in range(first + 1, len(tracks)):
-                if (
-                    _iou(tracks[first].bbox, tracks[second].bbox)
-                    >= self.duplicate_iou_threshold
-                ):
+                overlap = _iou(tracks[first].bbox, tracks[second].bbox)
+                if overlap < self.duplicate_iou_threshold:
+                    continue
+                first_center = tracks[first].center
+                second_center = tracks[second].center
+                distance = hypot(
+                    first_center[0] - second_center[0],
+                    first_center[1] - second_center[1],
+                )
+                width = max(
+                    tracks[first].x2 - tracks[first].x1,
+                    tracks[second].x2 - tracks[second].x1,
+                )
+                height = max(
+                    tracks[first].y2 - tracks[first].y1,
+                    tracks[second].y2 - tracks[second].y1,
+                )
+                distance_ratio = distance / max(1.0, hypot(width, height))
+                if distance_ratio <= self.duplicate_center_distance_ratio:
                     union(first, second)
 
         grouped: dict[int, list[TrackedDetection]] = defaultdict(list)
@@ -312,23 +352,3 @@ class IdentityConsolidator:
         while canonical_id in self._aliases:
             canonical_id = self._aliases[canonical_id]
         return canonical_id
-
-    def _merge_identities(self, first_id: int, second_id: int) -> int:
-        first_id = self._resolve(first_id)
-        second_id = self._resolve(second_id)
-        if first_id == second_id:
-            return first_id
-
-        keep_id, remove_id = sorted((first_id, second_id))
-        keep = self._states[keep_id]
-        remove = self._states[remove_id]
-        for class_key, score in remove.class_scores.items():
-            keep.class_scores[class_key] += score
-        if remove.last_frame > keep.last_frame:
-            keep.last_frame = remove.last_frame
-            keep.bbox = remove.bbox
-            keep.velocity_x = remove.velocity_x
-            keep.velocity_y = remove.velocity_y
-        self._aliases[remove_id] = keep_id
-        del self._states[remove_id]
-        return keep_id

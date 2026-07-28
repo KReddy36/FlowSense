@@ -216,6 +216,10 @@ After ByteTrack assigns raw identities, the consolidation layer:
 - merges strongly overlapping detections under one canonical ID;
 - hides all but the highest-confidence duplicate in a frame;
 - reconnects new raw IDs to recently missing objects using predicted position;
+- refuses to merge two established identities solely because their boxes
+  overlap;
+- splits a mistaken reidentification when two spatially separate vehicles
+  later appear in the same frame;
 - preserves one ID and color across those matches; and
 - stabilizes brief class changes using accumulated confidence.
 
@@ -245,4 +249,5 @@ See `FILE_MANIFEST.md` for the complete production/test-only distinction.
   appearance embeddings.
 - Pixel motion depends on the fixed camera view and is not real-world speed.
 - Heavy occlusion or long detection gaps can still create new identities.
-- Closely overlapping real objects can occasionally be mistaken for duplicates.
+- Very long, complete occlusions can still make two visually similar vehicles
+  difficult to distinguish without appearance embeddings.
