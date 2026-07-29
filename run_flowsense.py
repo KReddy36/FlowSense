@@ -110,6 +110,16 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Replace final files if they already exist.",
     )
+    parser.add_argument(
+        "--disable-learned-prediction",
+        action="store_true",
+        help="Use only the constant-velocity predictor.",
+    )
+    parser.add_argument(
+        "--learned-model",
+        type=Path,
+        help="Optional portable learned-corrector JSON file.",
+    )
     return parser.parse_args()
 
 
@@ -136,6 +146,8 @@ def main() -> None:
                 maximum_frames=args.max_frames,
                 keep_intermediates=args.keep_intermediates,
                 overwrite=args.overwrite,
+                use_learned_prediction=not args.disable_learned_prediction,
+                learned_model_path=args.learned_model,
             )
         )
     except (OSError, RuntimeError, ValueError) as exc:

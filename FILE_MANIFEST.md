@@ -25,6 +25,8 @@ development-only verification files.
 - `flowsense/tracking/bytetrack_tracker.py`
 - `flowsense/tracking/identity_consolidator.py`
 - `flowsense/tracking/motion_prediction.py`
+- `flowsense/tracking/learned_motion.py` — dependency-free hybrid corrector
+- `flowsense/models/learned_prediction_corrector.json` — portable Ridge model
 - `flowsense/tracking/render.py`
 - `flowsense/tracking/schemas.py`
 
@@ -35,6 +37,7 @@ development-only verification files.
 - `README.md`
 - `README_automatic_counter.md`
 - `PREDICTION_EVALUATION.md`
+- `LEARNED_PREDICTION.md`
 - `automatic_counter_config.example.json`
 - `FILE_MANIFEST.md`
 - `LICENSE`
@@ -52,6 +55,7 @@ and presentation:
 - `easy_results/comparison_by_video_class.csv`
 - `easy_results/object_movement_audit.csv`
 - `easy_results/prediction_accuracy.csv`
+- `easy_results/learned_prediction_results.csv`
 - `easy_results/summary.json`
 - `easy_results/traffic_volume_intervals.csv`
 - `easy_results/video_file_map.csv`
@@ -112,6 +116,7 @@ runtime-only submission:
 - `tests/test_end_to_end_pipeline.py`
 - `tests/test_identity_consolidator.py`
 - `tests/test_motion_prediction.py`
+- `tests/test_learned_motion.py`
 - `tests/test_prediction_evaluation.py`
 - `tests/test_video_compat.py`
 - `tests/test_yolo_detector.py`

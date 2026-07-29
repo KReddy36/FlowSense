@@ -9,7 +9,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
-from .tracking import MotionPredictor, TrackedDetection
+from .tracking import LearnedMotionCorrector, MotionPredictor, TrackedDetection
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +34,9 @@ def evaluate_tracking_csv(
     velocity_window: int = 5,
     prediction_horizon_frames: int = 15,
     inactive_timeout_frames: int = 30,
+    learned_corrector: LearnedMotionCorrector | None = None,
+    frame_width: float | None = None,
+    frame_height: float | None = None,
 ) -> list[PredictionError]:
     """Evaluate actual MotionPredictor outputs against future track centers."""
     csv_path = Path(path)
@@ -53,6 +56,9 @@ def evaluate_tracking_csv(
         velocity_window=velocity_window,
         prediction_horizon_frames=prediction_horizon_frames,
         inactive_timeout_frames=inactive_timeout_frames,
+        learned_corrector=learned_corrector,
+        frame_width=frame_width,
+        frame_height=frame_height,
     )
     actual_centers = {
         (row.frame_id, row.track_id): row.center
