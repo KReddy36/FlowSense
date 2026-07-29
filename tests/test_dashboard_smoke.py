@@ -77,9 +77,24 @@ class DashboardSmokeTests(unittest.TestCase):
 
         app.radio[0].set_value("Prediction & Evaluation")
         app.run(timeout=60)
+        scope_dividers = [
+            markdown.value
+            for markdown in app.markdown
+            if "text-transform: uppercase" in markdown.value
+        ]
+        self.assertEqual(len(scope_dividers), 3)
+        self.assertIn("Selected video · Video 4", scope_dividers[0])
+        self.assertIn(
+            "All videos · Cross-video prediction comparison",
+            scope_dividers[1],
+        )
+        self.assertIn(
+            "Selected video · Video 4 count evaluation",
+            scope_dividers[2],
+        )
         self.assertTrue(
             any(
-                metric.label == "Prediction accuracy (win rate)"
+                metric.label == "Hybrid beats constant velocity"
                 for metric in app.metric
             )
         )

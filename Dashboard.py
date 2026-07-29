@@ -7,6 +7,7 @@ Run locally:
 from __future__ import annotations
 
 import json
+from html import escape
 from pathlib import Path
 
 import pandas as pd
@@ -35,10 +36,10 @@ ANALYSIS_STATE_KEY = "uploaded_analysis"
 UPLOADER_VERSION_KEY = "upload_widget_version"
 
 VIDEO_FILES = {
-    "Video 1": VIDEOS_DIR / "member2_bytetrack_overlay.mp4",
-    "Video 2": VIDEOS_DIR / "flowsense_tracking2.mp4",
-    "Video 3": VIDEOS_DIR / "flowsense_tracking3.mp4",
-    "Video 4": VIDEOS_DIR / "flowsense_tracking4 (1) (1) (1).mp4",
+    "Video 1": VIDEOS_DIR / "flowsense_hybrid_video_1.mp4",
+    "Video 2": VIDEOS_DIR / "flowsense_hybrid_video_2.mp4",
+    "Video 3": VIDEOS_DIR / "flowsense_hybrid_video_3.mp4",
+    "Video 4": VIDEOS_DIR / "flowsense_hybrid_video_4.mp4",
 }
 
 CLASS_COLUMNS = [
@@ -63,6 +64,7 @@ REQUIRED_RESULTS = [
     "comparison_by_video.csv",
     "comparison_by_video_class.csv",
     "prediction_accuracy.csv",
+    "learned_prediction_results.csv",
     "summary.json",
 ]
 
@@ -145,6 +147,7 @@ def render_project_results() -> None:
     comparison = load_csv("comparison_by_video.csv")
     class_comparison = load_csv("comparison_by_video_class.csv")
     prediction = load_csv("prediction_accuracy.csv")
+    learned_prediction = load_csv("learned_prediction_results.csv")
     summary = load_summary()
 
     with st.sidebar:
@@ -183,16 +186,230 @@ def render_project_results() -> None:
             summary,
         )
     else:
-        _render_prediction_evaluation(
+        _render_hybrid_prediction_evaluation(
             selected_video,
             prediction,
             comparison,
             class_comparison,
+            learned_prediction,
         )
 
     _render_project_method_and_limitations()
     st.caption(
         "FlowSense · Kellan Reddy · Kelvin Qian · Brayden Chen · Batuhan Akbas"
+    )
+
+
+def _render_hybrid_prediction_evaluation(
+    selected_video: str,
+    prediction: pd.DataFrame,
+    comparison: pd.DataFrame,
+    class_comparison: pd.DataFrame,
+    learned_prediction: pd.DataFrame,
+) -> None:
+    """Present stationary, mathematical, and learned-hybrid evaluations."""
+    selected_prediction = prediction.loc[
+        prediction["Dataset"] == selected_video
+    ].iloc[0]
+    selected_learned = learned_prediction.loc[
+        learned_prediction["Test set"] == selected_video
+    ].iloc[0]
+    overall = learned_prediction.loc[
+        learned_prediction["Test set"] == "All videos"
+    ].iloc[0]
+
+    _render_labeled_divider(f"Selected video · {selected_video}")
+    st.subheader(f"{selected_video} learned-hybrid position prediction")
+    columns = st.columns(5)
+    columns[0].metric("Eligible forecasts", f"{int(selected_learned['Samples']):,}")
+    columns[1].metric(
+        "Stationary median",
+        f"{selected_learned['Stationary median (px)']:.1f} px",
+    )
+    columns[2].metric(
+        "Constant-velocity median",
+        f"{selected_learned['Current median (px)']:.1f} px",
+    )
+    columns[3].metric(
+        "Learned-hybrid median",
+        f"{selected_learned['Hybrid median (px)']:.1f} px",
+    )
+    columns[4].metric(
+        "Hybrid beats constant velocity",
+        f"{selected_learned['Hybrid wins (%)']:.1f}%",
+    )
+    st.caption(
+        f"Forecast horizon: {int(selected_prediction['Prediction horizon (frames)'])} "
+        f"frames ({selected_prediction['Prediction horizon (seconds)']:.2f} s). "
+        "Lower pixel error is better."
+    )
+
+    _render_labeled_divider("All videos · Cross-video prediction comparison")
+    errors = learned_prediction.loc[
+        learned_prediction["Test set"] != "All videos",
+        [
+            "Test set",
+            "Stationary median (px)",
+            "Current median (px)",
+            "Hybrid median (px)",
+        ],
+    ].rename(
+        columns={
+            "Test set": "Dataset",
+            "Current median (px)": "Constant velocity (px)",
+            "Hybrid median (px)": "Learned hybrid (px)",
+        }
+    )
+    left, right = st.columns(2)
+    with left:
+        st.subheader("Prediction-method comparison")
+        st.bar_chart(
+            errors,
+            x="Dataset",
+            y=[
+                "Stationary median (px)",
+                "Constant velocity (px)",
+                "Learned hybrid (px)",
+            ],
+            x_label="Video",
+            y_label="Median error (pixels)",
+            stack=False,
+        )
+        st.caption("All three methods are grouped side by side for each video.")
+    with right:
+        st.subheader("Hybrid win rate vs constant velocity")
+        st.bar_chart(
+            learned_prediction.loc[
+                learned_prediction["Test set"] != "All videos",
+                ["Test set", "Hybrid wins (%)"],
+            ].set_index("Test set")
+        )
+
+    st.subheader("Overall leave-one-video-out results")
+    st.dataframe(
+        pd.DataFrame(
+            {
+                "Metric": [
+                    "Median error (px)",
+                    "Mean error (px)",
+                    "P90 error (px)",
+                ],
+                "Constant velocity": [
+                    overall["Current median (px)"],
+                    overall["Current mean (px)"],
+                    overall["Current P90 (px)"],
+                ],
+                "Learned hybrid": [
+                    overall["Hybrid median (px)"],
+                    overall["Hybrid mean (px)"],
+                    overall["Hybrid P90 (px)"],
+                ],
+            }
+        ),
+        hide_index=True,
+        width="stretch",
+    )
+    st.markdown(
+        """
+        Across **{samples:,}** held-out forecasts, median error fell from
+        **{current_median:.3f} px** to **{hybrid_median:.3f} px**; mean error
+        fell from **{current_mean:.3f} px** to **{hybrid_mean:.3f} px**; and
+        P90 error fell from **{current_p90:.3f} px** to **{hybrid_p90:.3f} px**.
+        The hybrid beat constant velocity on **{hybrid_wins:.3f}%** of samples.
+
+        The Ridge model adjusts only the **length** of the mathematical arrow;
+        it does not learn a new turning direction. Evaluation used
+        leave-one-video-out testing. The production model was subsequently
+        refitted on all four videos, and uploaded videos automatically use that
+        hybrid predictor with mathematical fallback.
+
+        These are short-term pixel-space forecasts—not driver-intention,
+        collision-risk, real-world position, or speed predictions.
+        """.format(
+            samples=int(overall["Samples"]),
+            current_median=overall["Current median (px)"],
+            hybrid_median=overall["Hybrid median (px)"],
+            current_mean=overall["Current mean (px)"],
+            hybrid_mean=overall["Hybrid mean (px)"],
+            current_p90=overall["Current P90 (px)"],
+            hybrid_p90=overall["Hybrid P90 (px)"],
+            hybrid_wins=overall["Hybrid wins (%)"],
+        )
+    )
+    st.subheader("Learned-prediction evaluation table")
+    st.dataframe(learned_prediction, hide_index=True, width="stretch")
+
+    _render_labeled_divider(f"Selected video · {selected_video} count evaluation")
+    st.subheader("Manual traffic count vs FlowSense")
+    selected_classes = class_comparison.loc[
+        class_comparison["Video"] == selected_video,
+        [
+            "Class",
+            "Kelvin count",
+            "Automatic count",
+            "Error (automatic - Kelvin)",
+            "Absolute error",
+            "Percent error",
+        ],
+    ].copy()
+    evaluation_left, evaluation_right = st.columns([1.1, 1])
+    with evaluation_left:
+        st.bar_chart(
+            selected_classes,
+            x="Class",
+            y=["Kelvin count", "Automatic count"],
+            x_label="Road-user class",
+            y_label="Count",
+            stack=False,
+        )
+    with evaluation_right:
+        st.dataframe(selected_classes, hide_index=True, width="stretch")
+
+    selected_comparison = comparison.loc[
+        comparison["Video"] == selected_video
+    ].iloc[0]
+    if selected_comparison["Dataset role"] == "Evaluation":
+        manual = float(selected_comparison["Kelvin vehicles"])
+        automatic = float(selected_comparison["Automatic vehicles"])
+        agreement = (
+            max(0.0, 1.0 - abs(automatic - manual) / manual)
+            if manual
+            else 0.0
+        )
+        st.metric(
+            "Evaluation-set total-count agreement",
+            f"{agreement:.1%}",
+            help=(
+                "Calculated as 1 - absolute vehicle-count error / manual "
+                "vehicle count; this is not object-level detection accuracy."
+            ),
+        )
+
+
+def _render_labeled_divider(label: str) -> None:
+    """Render a clear scope boundary without changing dashboard data."""
+    safe_label = escape(label)
+    st.markdown(
+        f"""
+        <div style="
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            margin: 1.6rem 0 1rem 0;
+        ">
+            <div style="height: 1px; flex: 1; background: #9ca3af;"></div>
+            <div style="
+                color: #4b5563;
+                font-size: 0.9rem;
+                font-weight: 700;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                white-space: nowrap;
+            ">{safe_label}</div>
+            <div style="height: 1px; flex: 1; background: #9ca3af;"></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
 
@@ -527,7 +744,8 @@ def _render_project_method_and_limitations() -> None:
 
             - A pretrained YOLO model detects road users in each frame.
             - ByteTrack and identity consolidation create more stable object IDs.
-            - Recent track velocity is used for short-term position prediction.
+            - Recent track velocity supplies a mathematical forecast; a Ridge
+              model adjusts its distance while preserving direction.
             - Stationary objects are excluded using trajectory movement.
             - Severely fragmented tracking switches to passage-line counting.
 
@@ -538,7 +756,8 @@ def _render_project_method_and_limitations() -> None:
             - Pixel motion is not real-world speed.
             - Prediction ground truth comes from later tracked centers, not
               independent human annotations.
-            - The predictor estimates short-term motion, not driver intention.
+            - Forecasts are pixel-space short-term motion estimates, not driver
+              intention, collision risk, or real-world speed.
             """
         )
 

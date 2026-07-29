@@ -4,13 +4,22 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
+import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
 from flowsense.csv_detections import load_detection_csv
-from flowsense.tracking import ByteTrackTracker, IdentityConsolidator, MotionPredictor
+from flowsense.tracking import (
+    ByteTrackTracker,
+    IdentityConsolidator,
+    LearnedMotionCorrector,
+    MotionPredictor,
+    default_model_path,
+)
 from flowsense.tracking.render import render_motion_paths, render_tracking_ids
-
+from flowsense.video_compat import convert_to_browser_mp4, is_h264_mp4
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,28 +37,28 @@ DATASETS = {
     "1": DatasetConfig(
         csv_path=Path("tracking_data/tracking_data.csv"),
         video_path=Path("videos/source_traffic.mp4"),
-        output_path=Path("outputs/member2_bytetrack_overlay.mp4"),
+        output_path=Path("videos/flowsense_hybrid_video_1.mp4"),
         tracks_output_path=Path("outputs/member2_canonical_tracks.csv"),
         motion_output_path=Path("outputs/member2_motion_predictions.csv"),
     ),
     "2": DatasetConfig(
         csv_path=Path("tracking_data/tracking_data2.csv"),
-        video_path=Path("videos/flowsense_tracking2.mp4"),
-        output_path=Path("outputs/member2_bytetrack_overlay2.mp4"),
+        video_path=Path("videos/source_traffic2.mp4"),
+        output_path=Path("videos/flowsense_hybrid_video_2.mp4"),
         tracks_output_path=Path("outputs/member2_canonical_tracks2.csv"),
         motion_output_path=Path("outputs/member2_motion_predictions2.csv"),
     ),
     "3": DatasetConfig(
         csv_path=Path("tracking_data/tracking_data3.csv"),
-        video_path=Path("videos/flowsense_tracking3.mp4"),
-        output_path=Path("outputs/member2_bytetrack_overlay3.mp4"),
+        video_path=Path("videos/source_traffic3.mp4"),
+        output_path=Path("videos/flowsense_hybrid_video_3.mp4"),
         tracks_output_path=Path("outputs/member2_canonical_tracks3.csv"),
         motion_output_path=Path("outputs/member2_motion_predictions3.csv"),
     ),
     "4": DatasetConfig(
         csv_path=Path("tracking_data/tracking_data4.csv"),
-        video_path=Path("videos/flowsense_tracking4.mp4"),
-        output_path=Path("outputs/member2_bytetrack_overlay4.mp4"),
+        video_path=Path("videos/source_traffic4.mp4"),
+        output_path=Path("videos/flowsense_hybrid_video_4.mp4"),
         tracks_output_path=Path("outputs/member2_canonical_tracks4.csv"),
         motion_output_path=Path("outputs/member2_motion_predictions4.csv"),
     ),
@@ -89,19 +98,88 @@ MOTION_CSV_COLUMNS = (
     "predicted_time_seconds",
     "predicted_center_x",
     "predicted_center_y",
+    "prediction_scale",
 )
 
 
-def resolve_built_in_video_path(video_path: Path) -> Path:
-    """Resolve upload-added filename suffixes for a built-in video.
+def validate_clean_source_path(video_path: str | Path) -> Path:
+    """Reject known FlowSense outputs so official videos cannot be double annotated."""
+    path = Path(video_path)
+    output_markers = (
+        "flowsense_tracking",
+        "member2_bytetrack_overlay",
+        "flowsense_hybrid",
+        "_flowsense",
+    )
+    if any(marker in path.stem.lower() for marker in output_markers):
+        raise ValueError(
+            f"Official rendering requires clean source footage, not an annotated "
+            f"FlowSense output: {path}"
+        )
+    if not path.is_file():
+        raise FileNotFoundError(f"Clean source video not found: {path}")
+    return path
 
-    GitHub/browser uploads can append strings such as `` (1)`` to a filename.
-    Prefer the canonical configured path, then accept exactly one matching MP4.
-    """
-    if video_path.is_file():
-        return video_path
-    matches = sorted(video_path.parent.glob(f"{video_path.stem}*.mp4"))
-    return matches[0] if len(matches) == 1 else video_path
+
+def load_prediction_corrector(
+    *,
+    disabled: bool,
+    model_path: str | Path | None,
+    prediction_horizon_frames: int,
+    velocity_window: int,
+) -> tuple[LearnedMotionCorrector | None, str]:
+    """Load the bundled corrector, with an explicit mathematical fallback."""
+    if disabled:
+        return None, "constant-velocity baseline (--disable-learned-prediction)"
+    selected_path = (
+        Path(model_path) if model_path is not None else default_model_path()
+    )
+    try:
+        corrector = LearnedMotionCorrector.from_json(selected_path)
+        if not corrector.compatible_with(
+            horizon_frames=prediction_horizon_frames,
+            velocity_window=velocity_window,
+        ):
+            raise ValueError(
+                "model settings do not match the prediction horizon/velocity window"
+            )
+    except (OSError, TypeError, ValueError, KeyError) as exc:
+        return None, f"constant-velocity fallback ({exc})"
+    return corrector, f"learned hybrid ({selected_path})"
+
+
+def build_motion_predictor(
+    *,
+    fps: float,
+    frame_width: int,
+    frame_height: int,
+    history_points: int = 30,
+    velocity_window: int = 5,
+    prediction_horizon_frames: int = 15,
+    inactive_timeout_frames: int = 30,
+    disable_learned_prediction: bool = False,
+    learned_model_path: str | Path | None = None,
+) -> tuple[MotionPredictor, str]:
+    """Build the shared predictor used by the official-video generator."""
+    corrector, mode = load_prediction_corrector(
+        disabled=disable_learned_prediction,
+        model_path=learned_model_path,
+        prediction_horizon_frames=prediction_horizon_frames,
+        velocity_window=velocity_window,
+    )
+    return (
+        MotionPredictor(
+            fps=fps,
+            history_points=history_points,
+            velocity_window=velocity_window,
+            prediction_horizon_frames=prediction_horizon_frames,
+            inactive_timeout_frames=inactive_timeout_frames,
+            frame_width=frame_width,
+            frame_height=frame_height,
+            learned_corrector=corrector,
+        ),
+        mode,
+    )
 
 
 def track_csv_on_video(
@@ -118,6 +196,8 @@ def track_csv_on_video(
     velocity_window: int = 5,
     prediction_horizon_frames: int = 15,
     inactive_timeout_frames: int = 30,
+    disable_learned_prediction: bool = False,
+    learned_model_path: str | Path | None = None,
 ) -> dict[str, int | float | str]:
     """Render tracks/predictions and export canonical and motion CSV data."""
     try:
@@ -128,13 +208,10 @@ def track_csv_on_video(
         ) from exc
 
     csv_path = Path(csv_path)
-    video_path = Path(video_path)
+    video_path = validate_clean_source_path(video_path)
     output_path = Path(output_path)
     tracks_output_path = Path(tracks_output_path)
     motion_output_path = Path(motion_output_path)
-    if not video_path.is_file():
-        raise FileNotFoundError(f"Source video not found: {video_path}")
-
     detections_by_frame = load_detection_csv(csv_path)
     last_detection_frame = max(detections_by_frame)
 
@@ -158,10 +235,20 @@ def track_csv_on_video(
 
     tracks_output_path.parent.mkdir(parents=True, exist_ok=True)
     writer = None
+    staging_directory = None
+    staged_mp4v = None
+    staged_h264 = None
     if generate_video:
         output_path.parent.mkdir(parents=True, exist_ok=True)
+        staging_directory = tempfile.TemporaryDirectory(
+            prefix=".flowsense-render-",
+            dir=output_path.parent,
+        )
+        staging_path = Path(staging_directory.name)
+        staged_mp4v = staging_path / "annotated_mp4v.mp4"
+        staged_h264 = staging_path / "annotated_h264.mp4"
         writer = cv2.VideoWriter(
-            str(output_path),
+            str(staged_mp4v),
             cv2.VideoWriter_fourcc(*"mp4v"),
             fps,
             (width, height),
@@ -174,13 +261,18 @@ def track_csv_on_video(
 
     tracker = ByteTrackTracker(frame_rate=max(1, round(fps)))
     consolidator = IdentityConsolidator()
-    motion_predictor = MotionPredictor(
+    motion_predictor, prediction_mode = build_motion_predictor(
         fps=fps,
+        frame_width=width,
+        frame_height=height,
         history_points=history_points,
         velocity_window=velocity_window,
         prediction_horizon_frames=prediction_horizon_frames,
         inactive_timeout_frames=inactive_timeout_frames,
+        disable_learned_prediction=disable_learned_prediction,
+        learned_model_path=learned_model_path,
     )
+    print(f"Prediction mode: {prediction_mode}")
     processed_frames = 0
     rendered_tracks = 0
     motion_rows = 0
@@ -267,6 +359,7 @@ def track_csv_on_video(
                             "predicted_time_seconds": snapshot.predicted_time,
                             "predicted_center_x": snapshot.predicted_center_x,
                             "predicted_center_y": snapshot.predicted_center_y,
+                            "prediction_scale": snapshot.prediction_scale,
                         }
                     )
                     motion_rows += 1
@@ -299,16 +392,30 @@ def track_csv_on_video(
         tracks_file.close()
         if motion_file is not None:
             motion_file.close()
+        if sys.exc_info()[0] is not None and staging_directory is not None:
+            staging_directory.cleanup()
 
     required_frames = min(
         video_frame_count,
         maximum_frames if maximum_frames is not None else video_frame_count,
     )
     if processed_frames != required_frames:
+        if staging_directory is not None:
+            staging_directory.cleanup()
         raise RuntimeError(
             f"Video decoding stopped at frame {processed_frames}; "
             f"expected {required_frames}"
         )
+    if generate_video:
+        assert staged_mp4v is not None and staged_h264 is not None
+        try:
+            convert_to_browser_mp4(staged_mp4v, staged_h264)
+            if not is_h264_mp4(staged_h264):
+                raise RuntimeError("staged output failed H.264 validation")
+            os.replace(staged_h264, output_path)
+        finally:
+            if staging_directory is not None:
+                staging_directory.cleanup()
 
     summary: dict[str, int | float | str] = {
         "frames": processed_frames,
@@ -317,6 +424,9 @@ def track_csv_on_video(
         "motion_history_rows": motion_rows,
         "suppressed_duplicate_instances": suppressed_track_instances,
         "unique_track_ids": len(unique_track_ids),
+        "prediction_mode": prediction_mode,
+        "frame_width": width,
+        "frame_height": height,
         "output_video": (
             str(output_path.resolve()) if generate_video else "disabled"
         ),
@@ -339,6 +449,17 @@ def parse_args() -> argparse.Namespace:
             "Use one or all of Member 1's CSV/video pairs as ByteTrack input "
             "and overlay canonical tracking IDs on the associated video."
         )
+    )
+    parser.add_argument(
+        "--disable-learned-prediction",
+        action="store_true",
+        help="Use the original constant-velocity predictor for comparison.",
+    )
+    parser.add_argument(
+        "--learned-model",
+        type=Path,
+        default=None,
+        help="Optional learned-corrector JSON (default: bundled production model).",
     )
     parser.add_argument(
         "--dataset",
@@ -444,7 +565,7 @@ def run_from_args(arguments: argparse.Namespace) -> list[dict[str, int | float |
     summaries = []
     for dataset_id in dataset_ids:
         config = DATASETS[dataset_id]
-        configured_video = resolve_built_in_video_path(config.video_path)
+        configured_video = config.video_path
         print(f"\nProcessing dataset {dataset_id}")
         summaries.append(
             track_csv_on_video(
@@ -460,6 +581,10 @@ def run_from_args(arguments: argparse.Namespace) -> list[dict[str, int | float |
                 velocity_window=arguments.velocity_window,
                 prediction_horizon_frames=arguments.prediction_horizon,
                 inactive_timeout_frames=arguments.inactive_timeout,
+                disable_learned_prediction=getattr(
+                    arguments, "disable_learned_prediction", False
+                ),
+                learned_model_path=getattr(arguments, "learned_model", None),
             )
         )
     return summaries

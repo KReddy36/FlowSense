@@ -84,10 +84,11 @@ fold's training data, the hybrid reduced:
 - Mean error from **21.621 px to 18.897 px**
 - 90th-percentile error from **55.414 px to 46.238 px**
 
-All three metrics improved on every held-out video. The corrector is stored as
-portable JSON and requires no scikit-learn dependency at runtime. FlowSense
-automatically falls back to the original predictor if the model is unavailable
-or the runtime settings are incompatible. See
+All three metrics improved on every held-out video, and the hybrid beat the
+constant-velocity forecast on **66.287%** of eligible samples. The corrector is
+stored as portable JSON and requires no scikit-learn dependency at runtime.
+FlowSense automatically falls back to the original predictor if the model is
+unavailable or the runtime settings are incompatible. See
 [LEARNED_PREDICTION.md](LEARNED_PREDICTION.md) for the method, complete
 evaluation, safeguards, and limitations.
 
@@ -314,8 +315,11 @@ changes.
 
 For each active canonical track, FlowSense stores a bounded history of center
 points. It averages recent frame-to-frame velocities and projects the center
-forward by 15 frames. Observed trajectories are rendered as solid lines;
-predicted motion is rendered as a dashed line ending in an outlined marker.
+forward by 15 frames. A Ridge model adjusts the mathematical arrow's length
+while preserving its direction; the production model was refitted on all four
+videos after leave-one-video-out evaluation. Observed trajectories are rendered
+as solid lines, and predicted motion as a dashed line ending in an outlined
+marker. If the model cannot load, FlowSense safely uses constant velocity.
 
 ### Traffic counting
 
@@ -339,8 +343,11 @@ using Videos 1–3.
   object annotations.
 - Motion and prediction values are measured in image pixels. They are not
   calibrated real-world positions or speeds.
-- The predictor is a short-term constant-velocity model and can perform poorly
-  for nearly stationary or abruptly turning objects.
+- The learned hybrid corrects forecast distance but does not learn a new
+  turning direction, so it can still perform poorly for abruptly turning
+  objects.
+- Predictions are short-term pixel-space forecasts, not driver-intention,
+  collision-risk, real-world position, or speed estimates.
 - FlowSense analyzes prerecorded footage; it is not currently a live traffic
   control or safety system.
 
