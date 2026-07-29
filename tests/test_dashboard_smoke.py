@@ -26,6 +26,16 @@ class DashboardSmokeTests(unittest.TestCase):
             list(app.selectbox[0].options),
             ["Video 1", "Video 2", "Video 3", "Video 4"],
         )
+        self.assertEqual(
+            list(app.radio[0].options),
+            [
+                "Network Overview",
+                "Video Analysis",
+                "Prediction & Evaluation",
+            ],
+        )
+        app.radio[0].set_value("Video Analysis")
+        app.run(timeout=60)
         expected_totals = {
             "Video 1": "6",
             "Video 2": "77",
@@ -35,11 +45,25 @@ class DashboardSmokeTests(unittest.TestCase):
         for video, expected in expected_totals.items():
             app.selectbox[0].select(video)
             app.run(timeout=60)
+            vehicle_metric = next(
+                metric
+                for metric in app.metric
+                if metric.label == "Vehicles counted"
+            )
             self.assertEqual(
-                app.metric[0].value,
+                vehicle_metric.value,
                 expected,
                 msg=f"Unexpected saved vehicle total for {video}",
             )
+
+        app.radio[0].set_value("Prediction & Evaluation")
+        app.run(timeout=60)
+        self.assertTrue(
+            any(
+                metric.label == "Prediction accuracy (win rate)"
+                for metric in app.metric
+            )
+        )
         self.assertEqual(list(app.exception), [])
 
     def test_uploaded_result_displays_prediction_accuracy(self) -> None:
@@ -80,10 +104,11 @@ class DashboardSmokeTests(unittest.TestCase):
             prediction_metrics = [
                 metric
                 for metric in app.metric
-                if metric.label == "Prediction accuracy"
+                if metric.label == "Prediction accuracy (win rate)"
             ]
-            self.assertEqual(len(prediction_metrics), 1)
-            self.assertEqual(prediction_metrics[0].value, "83.4%")
+            self.assertTrue(
+                any(metric.value == "83.4%" for metric in prediction_metrics)
+            )
             self.assertTrue(
                 any(
                     "61,388 forecasts" in caption.value

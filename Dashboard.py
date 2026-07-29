@@ -13,7 +13,6 @@ import pandas as pd
 import streamlit as st
 
 from flowsense.dashboard_uploads import (
-    DEFAULT_RUNS_ROOT,
     MAX_UPLOAD_BYTES,
     MissingOutputError,
     analyze_saved_upload,
@@ -57,6 +56,21 @@ DIRECTION_COLUMNS = [
     "Mixed/unclear",
 ]
 
+REQUIRED_RESULTS = [
+    "automatic_counts.csv",
+    "traffic_volume_intervals.csv",
+    "comparison_by_video.csv",
+    "comparison_by_video_class.csv",
+    "prediction_accuracy.csv",
+    "summary.json",
+]
+
+PROJECT_VIEWS = [
+    "Network Overview",
+    "Video Analysis",
+    "Prediction & Evaluation",
+]
+
 
 st.set_page_config(
     page_title="FlowSense",
@@ -82,7 +96,8 @@ def load_yolo_detector() -> YoloDetector:
     return YoloDetector()
 
 
-def require_files(paths: list[Path]) -> None:
+def require_files() -> None:
+    paths = [RESULTS_DIR / filename for filename in REQUIRED_RESULTS]
     missing = [str(path.relative_to(ROOT)) for path in paths if not path.exists()]
     if missing:
         st.error("Required project files are missing:")
@@ -90,22 +105,34 @@ def require_files(paths: list[Path]) -> None:
         st.stop()
 
 
-def render_project_results() -> None:
-    """Render the original four-video saved-results dashboard."""
-    require_files(
-        [
-            RESULTS_DIR / "automatic_counts.csv",
-            RESULTS_DIR / "traffic_volume_intervals.csv",
-            RESULTS_DIR / "comparison_by_video.csv",
-            RESULTS_DIR / "comparison_by_video_class.csv",
-            RESULTS_DIR / "summary.json",
-        ]
+def class_table(row: pd.Series) -> pd.DataFrame:
+    values = (
+        row[CLASS_COLUMNS]
+        .astype(float)
+        .rename_axis("Class")
+        .reset_index(name="Count")
     )
+    return values[values["Count"] > 0]
 
+
+def direction_table(row: pd.Series) -> pd.DataFrame:
+    values = (
+        row[DIRECTION_COLUMNS]
+        .astype(float)
+        .rename_axis("Direction")
+        .reset_index(name="Count")
+    )
+    return values[values["Count"] > 0]
+
+
+def render_project_results() -> None:
+    """Render Kelvin's complete saved-results dashboard."""
+    require_files()
     counts = load_csv("automatic_counts.csv")
     intervals = load_csv("traffic_volume_intervals.csv")
     comparison = load_csv("comparison_by_video.csv")
     class_comparison = load_csv("comparison_by_video_class.csv")
+    prediction = load_csv("prediction_accuracy.csv")
     summary = load_summary()
 
     with st.sidebar:
@@ -121,19 +148,103 @@ def render_project_results() -> None:
             """
             **Pipeline**
 
-            Prerecorded video → YOLO detections → ByteTrack identities →
-            movement/line-crossing analysis → traffic dashboard
+            Video → YOLO detection → ByteTrack identities → identity
+            consolidation → motion prediction → traffic counting → evaluation
             """
         )
 
+    selected_view = st.radio(
+        "Project results view",
+        PROJECT_VIEWS,
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+    if selected_view == "Network Overview":
+        _render_network_overview(counts, prediction, summary)
+    elif selected_view == "Video Analysis":
+        _render_video_analysis(
+            selected_video,
+            show_video,
+            counts,
+            intervals,
+            comparison,
+            summary,
+        )
+    else:
+        _render_prediction_evaluation(
+            selected_video,
+            prediction,
+            comparison,
+            class_comparison,
+        )
+
+    _render_project_method_and_limitations()
+    st.caption(
+        "FlowSense · Kellan Reddy · Kelvin Qian · Brayden Chen · Batuhan Akbas"
+    )
+
+
+def _render_network_overview(
+    counts: pd.DataFrame,
+    prediction: pd.DataFrame,
+    summary: dict,
+) -> None:
+    combined = summary["combined"]
+    overall_prediction = prediction.loc[
+        prediction["Dataset"] == "All videos"
+    ].iloc[0]
+
+    st.subheader("Combined system results")
+    metric1, metric2, metric3, metric4, metric5 = st.columns(5)
+    metric1.metric("Videos analyzed", int(combined["videos_analyzed"]))
+    metric2.metric("Moving objects", int(combined["moving_ids_counted"]))
+    metric3.metric("Parked / excluded", int(combined["parked_or_excluded_ids"]))
+    metric4.metric(
+        "Prediction accuracy (win rate)",
+        f"{overall_prediction['Prediction win rate (%)']:.1f}%",
+        help="Share of eligible forecasts that beat a stationary baseline.",
+    )
+    metric5.metric(
+        "Median prediction error",
+        f"{overall_prediction['Median prediction error (px)']:.1f} px",
+    )
+
+    overview_left, overview_right = st.columns(2)
+    with overview_left:
+        st.subheader("Moving objects by video")
+        st.bar_chart(
+            counts[["Video", "Moving objects counted"]].set_index("Video")
+        )
+
+    with overview_right:
+        st.subheader("Combined class distribution")
+        combined_classes = pd.DataFrame(
+            {
+                "Class": list(combined["counts_by_class"].keys()),
+                "Count": list(combined["counts_by_class"].values()),
+            }
+        )
+        st.bar_chart(combined_classes, x="Class", y="Count")
+
+    st.subheader("All traffic-analysis results")
+    st.dataframe(counts, hide_index=True, width="stretch")
+
+
+def _render_video_analysis(
+    selected_video: str,
+    show_video: bool,
+    counts: pd.DataFrame,
+    intervals: pd.DataFrame,
+    comparison: pd.DataFrame,
+    summary: dict,
+) -> None:
     selected_counts = counts.loc[counts["Video"] == selected_video].iloc[0]
     selected_comparison = comparison.loc[
         comparison["Video"] == selected_video
     ].iloc[0]
     selected_summary = summary["videos"][selected_video]
 
-    st.subheader(f"{selected_video} overview")
-
+    st.subheader(f"{selected_video} traffic overview")
     kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
     kpi1.metric("Vehicles counted", int(selected_counts["Vehicles counted"]))
     kpi2.metric("Pedestrians", int(selected_counts["Pedestrians counted"]))
@@ -155,35 +266,32 @@ def render_project_results() -> None:
         f"**{selected_summary['movement_threshold_pixels']:.0f} px**"
     )
 
-    left, right = st.columns([1.6, 1])
-
-    with left:
-        st.subheader("Annotated tracking video")
+    video_column, class_column = st.columns([1.6, 1])
+    with video_column:
+        st.subheader("Annotated tracking and prediction video")
         video_path = VIDEO_FILES.get(selected_video)
         if show_video and video_path and video_path.exists():
             st.video(str(video_path))
+            st.caption(
+                "Solid paths show observed trajectories. Dashed extensions "
+                "show short-term predicted positions when available."
+            )
         elif show_video:
             st.warning(
-                "The annotated video is not available at the expected "
-                "repository path."
+                "The annotated video is not available at the expected path."
             )
         else:
             st.caption("Video display is disabled in the sidebar.")
 
-    with right:
+    with class_column:
         st.subheader("Counts by class")
-        class_values = (
-            selected_counts[CLASS_COLUMNS]
-            .astype(float)
-            .rename_axis("Class")
-            .reset_index(name="Count")
+        st.bar_chart(
+            class_table(selected_counts),
+            x="Class",
+            y="Count",
         )
-        class_values = class_values[class_values["Count"] > 0]
-        st.bar_chart(class_values, x="Class", y="Count")
 
-    st.divider()
     chart_left, chart_right = st.columns(2)
-
     with chart_left:
         st.subheader("Traffic volume by 5-second interval")
         selected_intervals = intervals.loc[
@@ -196,7 +304,7 @@ def render_project_results() -> None:
             ),
             axis=1,
         )
-        volume_over_time = (
+        volume = (
             selected_intervals.groupby(
                 ["Interval start (s)", "Interval"],
                 as_index=False,
@@ -204,15 +312,9 @@ def render_project_results() -> None:
             .sum()
             .sort_values("Interval start (s)")
         )
-        st.line_chart(
-            volume_over_time,
-            x="Interval",
-            y="Automatic count",
-        )
-        if not volume_over_time.empty:
-            busiest = volume_over_time.loc[
-                volume_over_time["Automatic count"].idxmax()
-            ]
+        st.line_chart(volume, x="Interval", y="Automatic count")
+        if not volume.empty:
+            busiest = volume.loc[volume["Automatic count"].idxmax()]
             st.caption(
                 f"Busiest interval: {busiest['Interval']} "
                 f"({int(busiest['Automatic count'])} moving objects)"
@@ -220,18 +322,115 @@ def render_project_results() -> None:
 
     with chart_right:
         st.subheader("Direction of movement")
-        direction_values = (
-            selected_counts[DIRECTION_COLUMNS]
-            .astype(float)
-            .rename_axis("Direction")
-            .reset_index(name="Count")
+        st.bar_chart(
+            direction_table(selected_counts),
+            x="Direction",
+            y="Count",
         )
-        direction_values = direction_values[direction_values["Count"] > 0]
-        st.bar_chart(direction_values, x="Direction", y="Count")
+
+
+def _render_prediction_evaluation(
+    selected_video: str,
+    prediction: pd.DataFrame,
+    comparison: pd.DataFrame,
+    class_comparison: pd.DataFrame,
+) -> None:
+    selected_prediction = prediction.loc[
+        prediction["Dataset"] == selected_video
+    ].iloc[0]
+    overall_prediction = prediction.loc[
+        prediction["Dataset"] == "All videos"
+    ].iloc[0]
+
+    st.subheader(f"{selected_video} short-term position prediction")
+    p1, p2, p3, p4, p5 = st.columns(5)
+    p1.metric("Eligible forecasts", f"{int(selected_prediction['Samples']):,}")
+    p2.metric(
+        "Prediction horizon",
+        f"{int(selected_prediction['Prediction horizon (frames)'])} frames",
+        f"{selected_prediction['Prediction horizon (seconds)']:.2f} s",
+    )
+    p3.metric(
+        "Median error",
+        f"{selected_prediction['Median prediction error (px)']:.1f} px",
+    )
+    p4.metric(
+        "Median improvement",
+        f"{selected_prediction['Median improvement vs baseline (%)']:.1f}%",
+        help=(
+            "Improvement in median error compared with assuming the object "
+            "does not move."
+        ),
+    )
+    p5.metric(
+        "Prediction accuracy (win rate)",
+        f"{selected_prediction['Prediction win rate (%)']:.1f}%",
+    )
+
+    if selected_prediction["Median improvement vs baseline (%)"] < 0:
+        st.warning(
+            "For this scene, the stationary baseline has a lower median error "
+            "than the motion predictor. This commonly happens when objects "
+            "move slowly or detection jitter is large relative to true motion."
+        )
+    else:
+        st.success(
+            "For this scene, the motion predictor improves on the stationary "
+            "baseline in median error."
+        )
+
+    error_chart = prediction.loc[
+        prediction["Dataset"] != "All videos",
+        [
+            "Dataset",
+            "Median prediction error (px)",
+            "Median stationary baseline error (px)",
+        ],
+    ].set_index("Dataset")
+
+    prediction_left, prediction_right = st.columns(2)
+    with prediction_left:
+        st.subheader("Prediction vs stationary baseline")
+        st.bar_chart(error_chart)
+        st.caption("Lower pixel error is better.")
+
+    with prediction_right:
+        st.subheader("Prediction win rate by video")
+        win_rate_chart = prediction.loc[
+            prediction["Dataset"] != "All videos",
+            ["Dataset", "Prediction win rate (%)"],
+        ].set_index("Dataset")
+        st.bar_chart(win_rate_chart)
+
+    st.subheader("How prediction is evaluated")
+    st.markdown(
+        """
+        The predictor estimates an object's image-center position 15 frames
+        into the future using an average of recent velocities. Each forecast is
+        compared with the same track's later observed center. The stationary
+        baseline assumes the object stays at its current center.
+
+        Across all four videos, the predictor evaluated
+        **{samples:,} forecasts**, achieved a median error of
+        **{prediction_error:.3f} px**, and beat the stationary baseline on
+        **{win_rate:.2f}%** of eligible samples.
+
+        This is short-term image-position prediction—not driver-intention,
+        collision-risk, or real-world speed prediction.
+        """.format(
+            samples=int(overall_prediction["Samples"]),
+            prediction_error=overall_prediction[
+                "Median prediction error (px)"
+            ],
+            win_rate=overall_prediction["Prediction win rate (%)"],
+        )
+    )
+
+    st.subheader("Prediction evaluation table")
+    st.dataframe(prediction, hide_index=True, width="stretch")
 
     st.divider()
-    st.subheader("Manual count vs FlowSense")
-
+    st.subheader("Manual traffic count vs FlowSense")
     selected_class_comparison = class_comparison.loc[
         class_comparison["Video"] == selected_video,
         [
@@ -244,24 +443,27 @@ def render_project_results() -> None:
         ],
     ].copy()
 
-    comparison_chart = selected_class_comparison[
-        ["Class", "Kelvin count", "Automatic count"]
-    ].set_index("Class")
-
-    comparison_left, comparison_right = st.columns([1.1, 1])
-    with comparison_left:
-        st.bar_chart(comparison_chart)
-    with comparison_right:
+    evaluation_left, evaluation_right = st.columns([1.1, 1])
+    with evaluation_left:
+        st.bar_chart(
+            selected_class_comparison[
+                ["Class", "Kelvin count", "Automatic count"]
+            ].set_index("Class")
+        )
+    with evaluation_right:
         st.dataframe(
             selected_class_comparison,
             hide_index=True,
             width="stretch",
         )
 
-    if role == "Evaluation":
+    selected_comparison = comparison.loc[
+        comparison["Video"] == selected_video
+    ].iloc[0]
+    if selected_comparison["Dataset role"] == "Evaluation":
         manual_total = float(selected_comparison["Kelvin vehicles"])
         automatic_total = float(selected_comparison["Automatic vehicles"])
-        evaluation_agreement = (
+        agreement = (
             max(
                 0.0,
                 1.0 - abs(automatic_total - manual_total) / manual_total,
@@ -271,44 +473,36 @@ def render_project_results() -> None:
         )
         st.metric(
             "Evaluation-set total-count agreement",
-            f"{evaluation_agreement:.1%}",
+            f"{agreement:.1%}",
             help=(
                 "Calculated as 1 − absolute vehicle-count error / manual "
-                "vehicle count. This measures total-count agreement, not "
-                "object-level detection accuracy."
+                "vehicle count. This is not object-level detection accuracy."
             ),
         )
 
+
+def _render_project_method_and_limitations() -> None:
     with st.expander("Method and limitations"):
         st.markdown(
             """
             **Method**
 
             - A pretrained YOLO model detects road users in each frame.
-            - ByteTrack and identity consolidation create more stable IDs.
-            - FlowSense excludes stationary objects using trajectory movement.
-            - For severely fragmented tracking, it switches to passage-line
-              counting.
-            - Counts are grouped by class, direction, and five-second interval.
+            - ByteTrack and identity consolidation create more stable object IDs.
+            - Recent track velocity is used for short-term position prediction.
+            - Stationary objects are excluded using trajectory movement.
+            - Severely fragmented tracking switches to passage-line counting.
 
             **Limitations**
 
-            - Occlusion can cause a road user to receive a new tracking ID.
-            - Cars and trucks may be confused when vehicles are distant or
-              partly hidden.
-            - Pixel movement is not the same as real-world speed.
-            - Camera perspective affects direction and passage-line
-              interpretation.
-            - Manual counts are an approximate ground truth.
+            - Occlusion can create new tracking identities.
+            - Cars and trucks may be confused when distant or partly hidden.
+            - Pixel motion is not real-world speed.
+            - Prediction ground truth comes from later tracked centers, not
+              independent human annotations.
+            - The predictor estimates short-term motion, not driver intention.
             """
         )
-
-    with st.expander("All video results"):
-        st.dataframe(counts, hide_index=True, width="stretch")
-
-    st.caption(
-        "FlowSense · Kellan Reddy · Kelvin Qian · Brayden Chen · Batuhan Akbas"
-    )
 
 
 def render_upload_analysis() -> None:
@@ -468,7 +662,7 @@ def _render_uploaded_result(analysis: dict[str, object]) -> None:
             if result.prediction_accuracy_percent is not None
             else "N/A"
         )
-        st.metric("Prediction accuracy", prediction_accuracy)
+        st.metric("Prediction accuracy (win rate)", prediction_accuracy)
         if result.prediction_accuracy_percent is None:
             st.caption(
                 "Not enough eligible forecasts were available to evaluate."
@@ -556,7 +750,7 @@ def _counts_dataframe(values: dict[str, int], label: str) -> pd.DataFrame:
 
 
 st.title("🚦 FlowSense")
-st.caption("AI-Powered Traffic Flow Analysis")
+st.caption("AI-Powered Traffic Flow Analysis and Short-Term Motion Prediction")
 
 project_results_tab, upload_tab = st.tabs(
     ["Project Results", "Analyze Your Video"]
