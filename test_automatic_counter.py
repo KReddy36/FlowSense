@@ -12,6 +12,7 @@ from automatic_counter import (
     default_video_label,
     discover_csvs,
     discover_kelvin_file,
+    evaluate_passage_viability,
     find_horizontal_passage,
     load_kelvin_class_totals,
     normalize_class_name,
@@ -114,6 +115,83 @@ class AutomaticCounterTests(unittest.TestCase):
         self.assertEqual(
             choose_counting_method("movement", 999.0, 150.0), "movement"
         )
+
+    def test_passage_viability_requires_representative_crossings(self) -> None:
+        rows: list[Detection] = []
+        for track_index in range(10):
+            track_id = f"vehicle-{track_index}"
+            if track_index < 5:
+                start_y, end_y = 200.0, 400.0
+            else:
+                start_y, end_y = 400.0, 500.0
+            rows.extend(
+                [
+                    detection(0, 0.0, track_id, "car", 100, start_y),
+                    detection(1, 1.0, track_id, "car", 100, end_y),
+                ]
+            )
+        movement_results = analyze_tracks(
+            detections=rows,
+            video="Viable line",
+            source_csv=Path("viable.csv"),
+            movement_threshold=50.0,
+            toward="down",
+            cross_traffic_ratio=0.15,
+            min_track_frames=1,
+            counting_method="movement",
+            passage_line_y=None,
+            passage_hysteresis_pixels=15.0,
+        )
+
+        viability = evaluate_passage_viability(
+            rows,
+            movement_results,
+            line_y=288.0,
+            hysteresis_pixels=15.0,
+        )
+
+        self.assertEqual(viability.moving_vehicle_candidates, 10)
+        self.assertEqual(viability.crossing_candidates, 5)
+        self.assertEqual(viability.crossing_ratio, 0.5)
+        self.assertTrue(viability.viable)
+
+    def test_passage_viability_rejects_unrepresentative_line(self) -> None:
+        rows: list[Detection] = []
+        for track_index in range(10):
+            track_id = f"vehicle-{track_index}"
+            if track_index < 2:
+                start_y, end_y = 200.0, 400.0
+            else:
+                start_y, end_y = 400.0, 500.0
+            rows.extend(
+                [
+                    detection(0, 0.0, track_id, "car", 100, start_y),
+                    detection(1, 1.0, track_id, "car", 100, end_y),
+                ]
+            )
+        movement_results = analyze_tracks(
+            detections=rows,
+            video="Unviable line",
+            source_csv=Path("unviable.csv"),
+            movement_threshold=50.0,
+            toward="down",
+            cross_traffic_ratio=0.15,
+            min_track_frames=1,
+            counting_method="movement",
+            passage_line_y=None,
+            passage_hysteresis_pixels=15.0,
+        )
+
+        viability = evaluate_passage_viability(
+            rows,
+            movement_results,
+            line_y=288.0,
+            hysteresis_pixels=15.0,
+        )
+
+        self.assertEqual(viability.crossing_candidates, 2)
+        self.assertEqual(viability.crossing_ratio, 0.2)
+        self.assertFalse(viability.viable)
 
     def test_vehicle_rate_excludes_pedestrians(self) -> None:
         rows = [
