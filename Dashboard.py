@@ -459,9 +459,25 @@ def _render_uploaded_result(analysis: dict[str, object]) -> None:
         st.warning(result.video_preview_warning)
 
     st.video(str(result.output_video), format="video/mp4")
-    metric_frames, metric_ids = st.columns(2)
+    metric_frames, metric_ids, metric_prediction = st.columns(3)
     metric_frames.metric("Frames processed", result.processed_frames)
     metric_ids.metric("Unique tracking IDs", result.unique_track_ids)
+    with metric_prediction:
+        prediction_accuracy = (
+            f"{result.prediction_accuracy_percent:.1f}%"
+            if result.prediction_accuracy_percent is not None
+            else "N/A"
+        )
+        st.metric("Prediction accuracy", prediction_accuracy)
+        if result.prediction_accuracy_percent is None:
+            st.caption(
+                "Not enough eligible forecasts were available to evaluate."
+            )
+        else:
+            st.caption(
+                f"Based on {result.prediction_accuracy_samples:,} forecasts "
+                "compared with the stationary baseline."
+            )
 
     count_left, count_right = st.columns(2)
     with count_left:
