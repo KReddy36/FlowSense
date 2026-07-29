@@ -175,7 +175,7 @@ def render_project_results() -> None:
         label_visibility="collapsed",
     )
     if selected_view == "Network Overview":
-        _render_network_overview(counts, prediction, summary)
+        _render_network_overview(counts, learned_prediction, summary)
     elif selected_view == "Video Analysis":
         _render_video_analysis(
             selected_video,
@@ -415,12 +415,12 @@ def _render_labeled_divider(label: str) -> None:
 
 def _render_network_overview(
     counts: pd.DataFrame,
-    prediction: pd.DataFrame,
+    learned_prediction: pd.DataFrame,
     summary: dict,
 ) -> None:
     combined = summary["combined"]
-    overall_prediction = prediction.loc[
-        prediction["Dataset"] == "All videos"
+    overall_hybrid = learned_prediction.loc[
+        learned_prediction["Test set"] == "All videos"
     ].iloc[0]
 
     st.subheader("Combined system results")
@@ -429,13 +429,17 @@ def _render_network_overview(
     metric2.metric("Moving objects", int(combined["moving_ids_counted"]))
     metric3.metric("Parked / excluded", int(combined["parked_or_excluded_ids"]))
     metric4.metric(
-        "Prediction accuracy (win rate)",
-        f"{overall_prediction['Prediction win rate (%)']:.1f}%",
-        help="Share of eligible forecasts that beat a stationary baseline.",
+        "Hybrid beats constant velocity",
+        f"{overall_hybrid['Hybrid wins (%)']:.3f}%",
+        help=(
+            "Share of held-out forecasts where the learned hybrid had lower "
+            "pixel error than the original constant-velocity predictor."
+        ),
     )
     metric5.metric(
-        "Median prediction error",
-        f"{overall_prediction['Median prediction error (px)']:.1f} px",
+        "Learned-hybrid median error",
+        f"{overall_hybrid['Hybrid median (px)']:.3f} px",
+        help="Overall median error from leave-one-video-out evaluation.",
     )
 
     overview_left, overview_right = st.columns(2)
@@ -561,178 +565,6 @@ def _render_video_analysis(
             direction_table(selected_counts),
             x="Direction",
             y="Count",
-        )
-
-
-def _render_prediction_evaluation(
-    selected_video: str,
-    prediction: pd.DataFrame,
-    comparison: pd.DataFrame,
-    class_comparison: pd.DataFrame,
-) -> None:
-    selected_prediction = prediction.loc[
-        prediction["Dataset"] == selected_video
-    ].iloc[0]
-    overall_prediction = prediction.loc[
-        prediction["Dataset"] == "All videos"
-    ].iloc[0]
-
-    st.subheader(f"{selected_video} short-term position prediction")
-    p1, p2, p3, p4, p5 = st.columns(5)
-    p1.metric("Eligible forecasts", f"{int(selected_prediction['Samples']):,}")
-    p2.metric(
-        "Prediction horizon",
-        f"{int(selected_prediction['Prediction horizon (frames)'])} frames",
-        f"{selected_prediction['Prediction horizon (seconds)']:.2f} s",
-    )
-    p3.metric(
-        "Median error",
-        f"{selected_prediction['Median prediction error (px)']:.1f} px",
-    )
-    p4.metric(
-        "Median improvement",
-        f"{selected_prediction['Median improvement vs baseline (%)']:.1f}%",
-        help=(
-            "Improvement in median error compared with assuming the object "
-            "does not move."
-        ),
-    )
-    p5.metric(
-        "Prediction accuracy (win rate)",
-        f"{selected_prediction['Prediction win rate (%)']:.1f}%",
-    )
-
-    if selected_prediction["Median improvement vs baseline (%)"] < 0:
-        st.warning(
-            "For this scene, the stationary baseline has a lower median error "
-            "than the motion predictor. This commonly happens when objects "
-            "move slowly or detection jitter is large relative to true motion."
-        )
-    else:
-        st.success(
-            "For this scene, the motion predictor improves on the stationary "
-            "baseline in median error."
-        )
-
-    error_chart = prediction.loc[
-        prediction["Dataset"] != "All videos",
-        [
-            "Dataset",
-            "Median prediction error (px)",
-            "Median stationary baseline error (px)",
-        ],
-    ]
-
-    prediction_left, prediction_right = st.columns(2)
-    with prediction_left:
-        st.subheader("Prediction vs stationary baseline")
-        st.bar_chart(
-            error_chart,
-            x="Dataset",
-            y=[
-                "Median prediction error (px)",
-                "Median stationary baseline error (px)",
-            ],
-            x_label="Video",
-            y_label="Median error (pixels)",
-            stack=False,
-        )
-        st.caption(
-            "Prediction and stationary-baseline errors are grouped side by "
-            "side for each video. Lower pixel error is better."
-        )
-
-    with prediction_right:
-        st.subheader("Prediction win rate by video")
-        win_rate_chart = prediction.loc[
-            prediction["Dataset"] != "All videos",
-            ["Dataset", "Prediction win rate (%)"],
-        ].set_index("Dataset")
-        st.bar_chart(win_rate_chart)
-
-    st.subheader("How prediction is evaluated")
-    st.markdown(
-        """
-        The predictor estimates an object's image-center position 15 frames
-        into the future using an average of recent velocities. Each forecast is
-        compared with the same track's later observed center. The stationary
-        baseline assumes the object stays at its current center.
-
-        Across all four videos, the predictor evaluated
-        **{samples:,} forecasts**, achieved a median error of
-        **{prediction_error:.3f} px**, and beat the stationary baseline on
-        **{win_rate:.2f}%** of eligible samples.
-
-        This is short-term image-position prediction—not driver-intention,
-        collision-risk, or real-world speed prediction.
-        """.format(
-            samples=int(overall_prediction["Samples"]),
-            prediction_error=overall_prediction[
-                "Median prediction error (px)"
-            ],
-            win_rate=overall_prediction["Prediction win rate (%)"],
-        )
-    )
-
-    st.subheader("Prediction evaluation table")
-    st.dataframe(prediction, hide_index=True, width="stretch")
-
-    st.divider()
-    st.subheader("Manual traffic count vs FlowSense")
-    selected_class_comparison = class_comparison.loc[
-        class_comparison["Video"] == selected_video,
-        [
-            "Class",
-            "Kelvin count",
-            "Automatic count",
-            "Error (automatic - Kelvin)",
-            "Absolute error",
-            "Percent error",
-        ],
-    ].copy()
-
-    evaluation_left, evaluation_right = st.columns([1.1, 1])
-    with evaluation_left:
-        st.bar_chart(
-            selected_class_comparison,
-            x="Class",
-            y=["Kelvin count", "Automatic count"],
-            x_label="Road-user class",
-            y_label="Count",
-            stack=False,
-        )
-        st.caption(
-            "Manual and automatic counts are grouped side by side for each "
-            "road-user class."
-        )
-    with evaluation_right:
-        st.dataframe(
-            selected_class_comparison,
-            hide_index=True,
-            width="stretch",
-        )
-
-    selected_comparison = comparison.loc[
-        comparison["Video"] == selected_video
-    ].iloc[0]
-    if selected_comparison["Dataset role"] == "Evaluation":
-        manual_total = float(selected_comparison["Kelvin vehicles"])
-        automatic_total = float(selected_comparison["Automatic vehicles"])
-        agreement = (
-            max(
-                0.0,
-                1.0 - abs(automatic_total - manual_total) / manual_total,
-            )
-            if manual_total
-            else 0.0
-        )
-        st.metric(
-            "Evaluation-set total-count agreement",
-            f"{agreement:.1%}",
-            help=(
-                "Calculated as 1 − absolute vehicle-count error / manual "
-                "vehicle count. This is not object-level detection accuracy."
-            ),
         )
 
 
