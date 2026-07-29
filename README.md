@@ -96,6 +96,10 @@ evaluation, safeguards, and limitations.
 
 The dashboard uses the precomputed files already stored in `easy_results/`.
 You do **not** need to rerun YOLO or process the videos before opening it.
+The four built-in annotated videos stream from their hosted GitHub media
+objects, so dashboard viewers do not need Git LFS or FFmpeg commands to see
+them. Git LFS is only needed by contributors who want local copies of the
+large video files.
 
 ### macOS
 

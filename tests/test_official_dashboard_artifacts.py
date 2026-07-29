@@ -19,15 +19,18 @@ class OfficialDashboardArtifactTests(unittest.TestCase):
         )
         self.assertIn("maxUploadSize = 100", config)
 
-    def test_dashboard_requires_learned_results_and_maps_all_hybrid_videos(self) -> None:
+    def test_dashboard_requires_learned_results_and_streams_all_hybrid_videos(
+        self,
+    ) -> None:
         source = (ROOT / "Dashboard.py").read_text(encoding="utf-8")
         self.assertIn('"learned_prediction_results.csv"', source)
-        for video_id in range(1, 5):
-            self.assertIn(
-                f'"Video {video_id}": VIDEOS_DIR / '
-                f'"flowsense_hybrid_video_{video_id}.mp4"',
-                source,
-            )
+        self.assertIn(
+            '"KReddy36/FlowSense/main/videos"',
+            source,
+        )
+        self.assertIn('f"Video {number}"', source)
+        self.assertIn("flowsense_hybrid_video_{number}.mp4", source)
+        self.assertIn("for number in range(1, 5)", source)
 
     def test_official_videos_are_materialized_h264_files(self) -> None:
         for video_id in range(1, 5):
