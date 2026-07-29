@@ -446,9 +446,16 @@ def _render_prediction_evaluation(
     evaluation_left, evaluation_right = st.columns([1.1, 1])
     with evaluation_left:
         st.bar_chart(
-            selected_class_comparison[
-                ["Class", "Kelvin count", "Automatic count"]
-            ].set_index("Class")
+            selected_class_comparison,
+            x="Class",
+            y=["Kelvin count", "Automatic count"],
+            x_label="Road-user class",
+            y_label="Count",
+            stack=False,
+        )
+        st.caption(
+            "Manual and automatic counts are grouped side by side for each "
+            "road-user class."
         )
     with evaluation_right:
         st.dataframe(

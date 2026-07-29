@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -64,6 +65,17 @@ class DashboardSmokeTests(unittest.TestCase):
                 for metric in app.metric
             )
         )
+        chart_specs = [
+            json.loads(chart.proto.spec)
+            for chart in app.get("vega_lite_chart")
+        ]
+        comparison_chart = next(
+            spec
+            for spec in chart_specs
+            if spec["encoding"]["x"].get("title") == "Road-user class"
+        )
+        self.assertFalse(comparison_chart["encoding"]["y"]["stack"])
+        self.assertIn("xOffset", comparison_chart["encoding"])
         self.assertEqual(list(app.exception), [])
 
     def test_uploaded_result_displays_prediction_accuracy(self) -> None:
