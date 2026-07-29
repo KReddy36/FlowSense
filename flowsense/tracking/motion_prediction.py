@@ -5,7 +5,9 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass, field
 from math import atan2, degrees, hypot
+from statistics import median
 
+from .learned_motion import LearnedMotionCorrector
 from .schemas import TrackedDetection
 
 
@@ -52,6 +54,9 @@ class _TrackState:
     class_name: str
     last_seen_frame: int
     last_seen_timestamp: float
+    confidence: float
+    box_width: float
+    box_height: float
     points: deque[MotionPoint] = field(default_factory=deque)
 
 
@@ -67,6 +72,9 @@ class MotionPredictor:
         prediction_horizon_frames: int = 15,
         inactive_timeout_frames: int = 30,
         prediction_segments: int = 6,
+        frame_width: float | None = None,
+        frame_height: float | None = None,
+        learned_corrector: LearnedMotionCorrector | None = None,
     ) -> None:
         if fps <= 0:
             raise ValueError("fps must be positive")
@@ -87,6 +95,17 @@ class MotionPredictor:
         self.prediction_horizon_frames = prediction_horizon_frames
         self.inactive_timeout_frames = inactive_timeout_frames
         self.prediction_segments = prediction_segments
+        self.frame_width = frame_width
+        self.frame_height = frame_height
+        self.learned_corrector = (
+            learned_corrector
+            if learned_corrector is not None
+            and learned_corrector.compatible_with(
+                horizon_frames=prediction_horizon_frames,
+                velocity_window=velocity_window,
+            )
+            else None
+        )
         self._states: dict[int, _TrackState] = {}
         self._last_frame_id: int | None = None
 
@@ -124,6 +143,9 @@ class MotionPredictor:
                     class_name=track.class_name,
                     last_seen_frame=frame_id,
                     last_seen_timestamp=track.timestamp,
+                    confidence=track.confidence,
+                    box_width=track.x2 - track.x1,
+                    box_height=track.y2 - track.y1,
                     points=deque(maxlen=self.history_points),
                 )
                 self._states[track.track_id] = state
@@ -141,6 +163,9 @@ class MotionPredictor:
             state.class_name = track.class_name
             state.last_seen_frame = frame_id
             state.last_seen_timestamp = track.timestamp
+            state.confidence = track.confidence
+            state.box_width = track.x2 - track.x1
+            state.box_height = track.y2 - track.y1
 
         expired = [
             track_id
@@ -174,8 +199,36 @@ class MotionPredictor:
         current_x = last_point.x + velocity_x * elapsed
         current_y = last_point.y + velocity_y * elapsed
         horizon_seconds = self.prediction_horizon_frames / self.fps
-        predicted_x = current_x + velocity_x * horizon_seconds
-        predicted_y = current_y + velocity_y * horizon_seconds
+        baseline_dx = velocity_x * horizon_seconds
+        baseline_dy = velocity_y * horizon_seconds
+        applied_scale = 1.0
+        velocities = self._recent_velocities(state.points)
+        if (
+            self.learned_corrector is not None
+            and self.frame_width is not None
+            and self.frame_height is not None
+            and len(state.points) >= self.velocity_window + 1
+        ):
+            correction = self.learned_corrector.correct(
+                class_name=state.class_name,
+                confidence=state.confidence,
+                center_x=current_x,
+                center_y=current_y,
+                box_width=state.box_width,
+                box_height=state.box_height,
+                frame_width=self.frame_width,
+                frame_height=self.frame_height,
+                baseline_dx=baseline_dx,
+                baseline_dy=baseline_dy,
+                mean_velocity_x=velocity_x,
+                mean_velocity_y=velocity_y,
+                velocities=velocities,
+                velocity_sample_seconds=self._median_elapsed(state.points),
+                history_points=len(state.points),
+            )
+            applied_scale = correction.applied_scale
+        predicted_x = current_x + baseline_dx * applied_scale
+        predicted_y = current_y + baseline_dy * applied_scale
         predicted_points = tuple(
             (
                 current_x
@@ -217,6 +270,17 @@ class MotionPredictor:
     def _average_velocity(
         self, points: deque[MotionPoint]
     ) -> tuple[float, float]:
+        recent = self._recent_velocities(points)
+        if not recent:
+            return 0.0, 0.0
+        return (
+            sum(velocity[0] for velocity in recent) / len(recent),
+            sum(velocity[1] for velocity in recent) / len(recent),
+        )
+
+    def _recent_velocities(
+        self, points: deque[MotionPoint]
+    ) -> list[tuple[float, float]]:
         velocities: list[tuple[float, float]] = []
         point_list = list(points)
         for previous, current in zip(point_list, point_list[1:]):
@@ -230,9 +294,13 @@ class MotionPredictor:
                 )
             )
         recent = velocities[-self.velocity_window :]
-        if not recent:
-            return 0.0, 0.0
-        return (
-            sum(velocity[0] for velocity in recent) / len(recent),
-            sum(velocity[1] for velocity in recent) / len(recent),
-        )
+        return recent
+
+    def _median_elapsed(self, points: deque[MotionPoint]) -> float:
+        point_list = list(points)[-(self.velocity_window + 1) :]
+        elapsed = [
+            current.timestamp - previous.timestamp
+            for previous, current in zip(point_list, point_list[1:])
+            if current.timestamp > previous.timestamp
+        ]
+        return median(elapsed) if elapsed else 1.0 / self.fps

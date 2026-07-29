@@ -6,8 +6,8 @@
 
 FlowSense turns traffic footage into an annotated video and a traffic-analysis
 report. It uses a pretrained YOLO model to detect road users, ByteTrack plus
-identity-consolidation logic to follow them across frames, short-term motion
-prediction to estimate where they are moving, and an automatic counter to
+identity-consolidation logic to follow them across frames, hybrid learned
+motion prediction to estimate where they are moving, and an automatic counter to
 summarize traffic by class, direction, and time interval.
 
 The repository also includes a Streamlit dashboard with the team's four
@@ -27,7 +27,8 @@ Main features:
 - Detects cars, trucks, buses, motorcycles, bicycles, and pedestrians.
 - Assigns and stabilizes object identities across video frames.
 - Suppresses duplicate tracks and reconnects short tracking gaps.
-- Predicts object centers 15 frames into the future.
+- Predicts object centers 15 frames into the future with a cautious learned
+  correction to the constant-velocity forecast.
 - Scores eligible predictions against later observed positions.
 - Excludes stationary objects and counts moving road users.
 - Switches to passage-line counting when tracking is severely fragmented.
@@ -71,6 +72,24 @@ The predictor did not outperform the stationary baseline on Video 1, where
 many objects moved very little. See
 [PREDICTION_EVALUATION.md](PREDICTION_EVALUATION.md) for the per-video table,
 methodology, and limitations.
+
+### Learned-prediction improvement
+
+A Ridge regression corrector was trained from the canonical trajectories to
+make limited adjustments to each mathematical prediction arrow. In
+leave-one-video-out testing, where every test video was excluded from that
+fold's training data, the hybrid reduced:
+
+- Median error from **10.012 px to 9.149 px**
+- Mean error from **21.621 px to 18.897 px**
+- 90th-percentile error from **55.414 px to 46.238 px**
+
+All three metrics improved on every held-out video. The corrector is stored as
+portable JSON and requires no scikit-learn dependency at runtime. FlowSense
+automatically falls back to the original predictor if the model is unavailable
+or the runtime settings are incompatible. See
+[LEARNED_PREDICTION.md](LEARNED_PREDICTION.md) for the method, complete
+evaluation, safeguards, and limitations.
 
 ## Open the dashboard
 
@@ -198,6 +217,9 @@ python3 run_flowsense.py video.mp4 --overwrite
 # Keep intermediate tracking, prediction, and counting files
 python3 run_flowsense.py video.mp4 --keep-intermediates
 
+# Use only the original constant-velocity predictor
+python3 run_flowsense.py video.mp4 --disable-learned-prediction
+
 # See every available setting
 python3 run_flowsense.py --help
 ```
@@ -232,6 +254,7 @@ The main saved outputs are in `easy_results/`:
 | `traffic_volume_intervals.csv` | Five-second traffic volumes |
 | `object_movement_audit.csv` | Counted/excluded decision for each track |
 | `prediction_accuracy.csv` | Motion-prediction evaluation |
+| `learned_prediction_results.csv` | Held-out learned-hybrid comparison |
 | `summary.json` | Machine-readable settings and results |
 
 For counter-specific options and file formats, see
@@ -254,7 +277,7 @@ end-to-end pipeline.
 
 | Team member | Primary contribution |
 | --- | --- |
-| **Batuhan Akbas** | YOLO detection foundation, initial detection/tracking notebook, traffic-video datasets, and project coordination |
+| **Batuhan Akbas** | YOLO detection foundation, traffic-video datasets, learned hybrid prediction experiment and integration, and project coordination |
 | **Kellan Reddy** | ByteTrack pipeline, identity consolidation, motion prediction and evaluation, end-to-end pipeline, testing, and repository integration |
 | **Brayden Chen** | Automatic traffic counter, hybrid movement/passage logic, generated reports, comparisons, and counter tests |
 | **Kelvin Qian** | Manual reference counts, result comparison, Streamlit dashboard, and visualization |
