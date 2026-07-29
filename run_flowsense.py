@@ -155,6 +155,8 @@ def main() -> None:
             f"({result.prediction_accuracy_samples} forecasts)"
         )
     print(f"  Annotated video: {result.output_video}")
+    if result.video_preview_warning:
+        print(f"  Video preview warning: {result.video_preview_warning}")
     print(f"  HTML report: {result.output_report}")
     if result.intermediate_dir is not None:
         print(f"  Debug intermediates: {result.intermediate_dir}")

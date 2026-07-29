@@ -12,10 +12,26 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from flowsense.dashboard_uploads import (
+    MAX_UPLOAD_BYTES,
+    MissingOutputError,
+    analyze_saved_upload,
+    build_intermediates_zip,
+    cleanup_abandoned_runs,
+    friendly_analysis_error,
+    remove_run_directory,
+    save_uploaded_mp4,
+    validate_pipeline_outputs,
+)
+from flowsense.pipeline import PipelineResult
+from flowsense.yolo_detector import YoloDetector
+
 
 ROOT = Path(__file__).resolve().parent
 RESULTS_DIR = ROOT / "easy_results"
 VIDEOS_DIR = ROOT / "videos"
+ANALYSIS_STATE_KEY = "uploaded_analysis"
+UPLOADER_VERSION_KEY = "upload_widget_version"
 
 VIDEO_FILES = {
     "Video 1": VIDEOS_DIR / "member2_bytetrack_overlay.mp4",
@@ -49,6 +65,12 @@ REQUIRED_RESULTS = [
     "summary.json",
 ]
 
+PROJECT_VIEWS = [
+    "Network Overview",
+    "Video Analysis",
+    "Prediction & Evaluation",
+]
+
 
 st.set_page_config(
     page_title="FlowSense",
@@ -66,6 +88,12 @@ def load_csv(filename: str) -> pd.DataFrame:
 def load_summary() -> dict:
     with (RESULTS_DIR / "summary.json").open(encoding="utf-8") as file:
         return json.load(file)
+
+
+@st.cache_resource(show_spinner=False)
+def load_yolo_detector() -> YoloDetector:
+    """Load YOLO once per Streamlit server process."""
+    return YoloDetector()
 
 
 def require_files() -> None:
@@ -97,47 +125,70 @@ def direction_table(row: pd.Series) -> pd.DataFrame:
     return values[values["Count"] > 0]
 
 
-require_files()
+def render_project_results() -> None:
+    """Render Kelvin's complete saved-results dashboard."""
+    require_files()
+    counts = load_csv("automatic_counts.csv")
+    intervals = load_csv("traffic_volume_intervals.csv")
+    comparison = load_csv("comparison_by_video.csv")
+    class_comparison = load_csv("comparison_by_video_class.csv")
+    prediction = load_csv("prediction_accuracy.csv")
+    summary = load_summary()
 
-counts = load_csv("automatic_counts.csv")
-intervals = load_csv("traffic_volume_intervals.csv")
-comparison = load_csv("comparison_by_video.csv")
-class_comparison = load_csv("comparison_by_video_class.csv")
-prediction = load_csv("prediction_accuracy.csv")
-summary = load_summary()
+    with st.sidebar:
+        st.header("Project Results Controls")
+        selected_video = st.selectbox(
+            "Select traffic footage",
+            counts["Video"].tolist(),
+        )
+        show_video = st.checkbox("Show annotated video", value=True)
 
+        st.divider()
+        st.markdown(
+            """
+            **Pipeline**
 
-st.title("🚦 FlowSense")
-st.caption("AI-Powered Traffic Flow Analysis and Short-Term Motion Prediction")
+            Video → YOLO detection → ByteTrack identities → identity
+            consolidation → motion prediction → traffic counting → evaluation
+            """
+        )
 
-with st.sidebar:
-    st.header("Dashboard Controls")
-    selected_video = st.selectbox(
-        "Select traffic footage",
-        counts["Video"].tolist(),
+    selected_view = st.radio(
+        "Project results view",
+        PROJECT_VIEWS,
+        horizontal=True,
+        label_visibility="collapsed",
     )
-    show_video = st.checkbox("Show annotated video", value=True)
+    if selected_view == "Network Overview":
+        _render_network_overview(counts, prediction, summary)
+    elif selected_view == "Video Analysis":
+        _render_video_analysis(
+            selected_video,
+            show_video,
+            counts,
+            intervals,
+            comparison,
+            summary,
+        )
+    else:
+        _render_prediction_evaluation(
+            selected_video,
+            prediction,
+            comparison,
+            class_comparison,
+        )
 
-    st.divider()
-    st.markdown(
-        """
-        **Pipeline**
-
-        Video → YOLO detection → ByteTrack identities → identity consolidation
-        → motion prediction → traffic counting → evaluation
-        """
+    _render_project_method_and_limitations()
+    st.caption(
+        "FlowSense · Kellan Reddy · Kelvin Qian · Brayden Chen · Batuhan Akbas"
     )
 
-overview_tab, video_tab, prediction_tab = st.tabs(
-    [
-        "Network Overview",
-        "Video Analysis",
-        "Prediction & Evaluation",
-    ]
-)
 
-
-with overview_tab:
+def _render_network_overview(
+    counts: pd.DataFrame,
+    prediction: pd.DataFrame,
+    summary: dict,
+) -> None:
     combined = summary["combined"]
     overall_prediction = prediction.loc[
         prediction["Dataset"] == "All videos"
@@ -149,7 +200,7 @@ with overview_tab:
     metric2.metric("Moving objects", int(combined["moving_ids_counted"]))
     metric3.metric("Parked / excluded", int(combined["parked_or_excluded_ids"]))
     metric4.metric(
-        "Prediction win rate",
+        "Prediction accuracy (win rate)",
         f"{overall_prediction['Prediction win rate (%)']:.1f}%",
         help="Share of eligible forecasts that beat a stationary baseline.",
     )
@@ -179,7 +230,14 @@ with overview_tab:
     st.dataframe(counts, hide_index=True, width="stretch")
 
 
-with video_tab:
+def _render_video_analysis(
+    selected_video: str,
+    show_video: bool,
+    counts: pd.DataFrame,
+    intervals: pd.DataFrame,
+    comparison: pd.DataFrame,
+    summary: dict,
+) -> None:
     selected_counts = counts.loc[counts["Video"] == selected_video].iloc[0]
     selected_comparison = comparison.loc[
         comparison["Video"] == selected_video
@@ -271,7 +329,12 @@ with video_tab:
         )
 
 
-with prediction_tab:
+def _render_prediction_evaluation(
+    selected_video: str,
+    prediction: pd.DataFrame,
+    comparison: pd.DataFrame,
+    class_comparison: pd.DataFrame,
+) -> None:
     selected_prediction = prediction.loc[
         prediction["Dataset"] == selected_video
     ].iloc[0]
@@ -300,7 +363,7 @@ with prediction_tab:
         ),
     )
     p5.metric(
-        "Prediction win rate",
+        "Prediction accuracy (win rate)",
         f"{selected_prediction['Prediction win rate (%)']:.1f}%",
     )
 
@@ -417,28 +480,282 @@ with prediction_tab:
             ),
         )
 
-with st.expander("Method and limitations"):
-    st.markdown(
-        """
-        **Method**
 
-        - A pretrained YOLO model detects road users in each frame.
-        - ByteTrack and identity consolidation create more stable object IDs.
-        - Recent track velocity is used for short-term position prediction.
-        - Stationary objects are excluded using trajectory movement.
-        - Severely fragmented tracking switches to passage-line counting.
+def _render_project_method_and_limitations() -> None:
+    with st.expander("Method and limitations"):
+        st.markdown(
+            """
+            **Method**
 
-        **Limitations**
+            - A pretrained YOLO model detects road users in each frame.
+            - ByteTrack and identity consolidation create more stable object IDs.
+            - Recent track velocity is used for short-term position prediction.
+            - Stationary objects are excluded using trajectory movement.
+            - Severely fragmented tracking switches to passage-line counting.
 
-        - Occlusion can create new tracking identities.
-        - Cars and trucks may be confused when distant or partly hidden.
-        - Pixel motion is not real-world speed.
-        - Prediction ground truth comes from later tracked centers, not
-          independent human annotations.
-        - The predictor estimates short-term motion, not driver intention.
-        """
+            **Limitations**
+
+            - Occlusion can create new tracking identities.
+            - Cars and trucks may be confused when distant or partly hidden.
+            - Pixel motion is not real-world speed.
+            - Prediction ground truth comes from later tracked centers, not
+              independent human annotations.
+            - The predictor estimates short-term motion, not driver intention.
+            """
+        )
+
+
+def render_upload_analysis() -> None:
+    """Render secure local upload, analysis, preview, and download controls."""
+    st.subheader("Analyze your own traffic video")
+    st.write(
+        "Upload one MP4 and FlowSense will run the same YOLO, tracking, "
+        "prediction, and counting pipeline used by the command-line tool."
+    )
+    st.warning(
+        "Processing may take several minutes on a CPU. Keep this browser tab "
+        "open until the analysis finishes."
     )
 
-st.caption(
-    "FlowSense · Kellan Reddy · Kelvin Qian · Brayden Chen · Batuhan Akbas"
+    analysis = st.session_state.get(ANALYSIS_STATE_KEY)
+    active_runs = [analysis["run_dir"]] if analysis else []
+    try:
+        cleanup_abandoned_runs(exclude=active_runs)
+    except OSError:
+        pass
+
+    uploader_version = st.session_state.get(UPLOADER_VERSION_KEY, 0)
+    uploaded_file = st.file_uploader(
+        "Upload an MP4 traffic video",
+        type=["mp4"],
+        accept_multiple_files=False,
+        key=f"traffic_video_upload_{uploader_version}",
+        help="Maximum upload size: 100 MB.",
+    )
+
+    if uploaded_file is not None:
+        size_bytes = int(uploaded_file.size)
+        st.caption(
+            f"Selected: **{uploaded_file.name}** · "
+            f"{size_bytes / (1024 * 1024):.2f} MB"
+        )
+        if size_bytes > MAX_UPLOAD_BYTES:
+            st.error("The selected video exceeds the 100 MB limit.")
+
+    if analysis is not None:
+        st.info(
+            "An uploaded analysis is already available below. Clear it before "
+            "processing another video."
+        )
+
+    analyze_clicked = st.button(
+        "Analyze video",
+        type="primary",
+        disabled=(
+            uploaded_file is None
+            or analysis is not None
+            or (
+                uploaded_file is not None
+                and int(uploaded_file.size) > MAX_UPLOAD_BYTES
+            )
+        ),
+    )
+    if analyze_clicked and uploaded_file is not None:
+        _analyze_uploaded_file(uploaded_file)
+
+    analysis = st.session_state.get(ANALYSIS_STATE_KEY)
+    if analysis is not None:
+        _render_uploaded_result(analysis)
+
+
+def _analyze_uploaded_file(uploaded_file: object) -> None:
+    status = st.status("Preparing uploaded video…", expanded=True)
+    progress_bar = st.progress(0.0)
+    progress_text = st.empty()
+    saved_upload = None
+    stage = "upload"
+
+    def update_progress(processed_frames: int, total_frames: int) -> None:
+        if total_frames > 0:
+            fraction = min(1.0, processed_frames / total_frames)
+            progress_bar.progress(fraction)
+            progress_text.caption(
+                f"Processed {processed_frames:,} of "
+                f"{total_frames:,} frames"
+            )
+        else:
+            progress_text.caption(f"Processed {processed_frames:,} frames")
+
+    try:
+        data = uploaded_file.getvalue()
+        saved_upload = save_uploaded_mp4(uploaded_file.name, data)
+        status.write("Upload validated and saved in an isolated temporary run.")
+
+        stage = "model"
+        status.update(label="Loading the YOLO detector…")
+        detector = load_yolo_detector()
+
+        stage = "processing"
+        status.update(label="Analyzing video frames…")
+        result = analyze_saved_upload(
+            saved_upload,
+            detector=detector,
+            progress_callback=update_progress,
+        )
+
+        stage = "outputs"
+        validate_pipeline_outputs(result)
+        progress_bar.progress(1.0)
+        progress_text.caption(
+            f"Processed {result.processed_frames:,} frames"
+        )
+        st.session_state[ANALYSIS_STATE_KEY] = {
+            "original_filename": saved_upload.original_filename,
+            "download_stem": saved_upload.download_stem,
+            "run_dir": str(saved_upload.run_dir),
+            "result": result,
+        }
+        status.update(
+            label="FlowSense analysis complete",
+            state="complete",
+            expanded=False,
+        )
+    except Exception as exc:
+        if saved_upload is not None:
+            try:
+                remove_run_directory(saved_upload.run_dir)
+            except (OSError, ValueError):
+                pass
+        status.update(
+            label="FlowSense could not analyze this video",
+            state="error",
+            expanded=True,
+        )
+        st.error(friendly_analysis_error(exc, stage=stage))
+
+
+def _render_uploaded_result(analysis: dict[str, object]) -> None:
+    result = analysis["result"]
+    if not isinstance(result, PipelineResult):
+        st.error("The saved analysis state is invalid. Clear it and try again.")
+        return
+
+    st.divider()
+    st.subheader(f"Results for {analysis['original_filename']}")
+    try:
+        validate_pipeline_outputs(result)
+    except MissingOutputError as exc:
+        st.error(str(exc))
+        _render_clear_button(analysis)
+        return
+
+    if result.video_preview_warning:
+        st.warning(result.video_preview_warning)
+
+    st.video(str(result.output_video), format="video/mp4")
+    metric_frames, metric_ids, metric_prediction = st.columns(3)
+    metric_frames.metric("Frames processed", result.processed_frames)
+    metric_ids.metric("Unique tracking IDs", result.unique_track_ids)
+    with metric_prediction:
+        prediction_accuracy = (
+            f"{result.prediction_accuracy_percent:.1f}%"
+            if result.prediction_accuracy_percent is not None
+            else "N/A"
+        )
+        st.metric("Prediction accuracy (win rate)", prediction_accuracy)
+        if result.prediction_accuracy_percent is None:
+            st.caption(
+                "Not enough eligible forecasts were available to evaluate."
+            )
+        else:
+            st.caption(
+                f"Based on {result.prediction_accuracy_samples:,} forecasts "
+                "compared with the stationary baseline."
+            )
+
+    count_left, count_right = st.columns(2)
+    with count_left:
+        st.markdown("#### Counts by class")
+        st.dataframe(
+            _counts_dataframe(result.counts_by_class, "Class"),
+            hide_index=True,
+            width="stretch",
+        )
+    with count_right:
+        st.markdown("#### Counts by direction")
+        st.dataframe(
+            _counts_dataframe(result.counts_by_direction, "Direction"),
+            hide_index=True,
+            width="stretch",
+        )
+
+    st.info(
+        "Solid lines show observed center-point paths. Dashed lines are "
+        "short-term pixel-space motion predictions, not calibrated real-world "
+        "positions or speeds."
+    )
+
+    stem = str(analysis["download_stem"])
+    video_bytes = result.output_video.read_bytes()
+    report_bytes = result.output_report.read_bytes()
+    download_video, download_report, download_debug = st.columns(3)
+    with download_video:
+        st.download_button(
+            "Download annotated MP4",
+            data=video_bytes,
+            file_name=f"{stem}_flowsense.mp4",
+            mime="video/mp4",
+        )
+    with download_report:
+        st.download_button(
+            "Download HTML report",
+            data=report_bytes,
+            file_name=f"{stem}_report.html",
+            mime="text/html",
+        )
+    with download_debug:
+        if result.intermediate_dir is not None:
+            try:
+                debug_zip = build_intermediates_zip(result.intermediate_dir)
+            except MissingOutputError as exc:
+                st.warning(str(exc))
+            else:
+                st.download_button(
+                    "Download analysis CSV ZIP",
+                    data=debug_zip,
+                    file_name=f"{stem}_analysis_csvs.zip",
+                    mime="application/zip",
+                )
+
+    _render_clear_button(analysis)
+
+
+def _render_clear_button(analysis: dict[str, object]) -> None:
+    if st.button("Clear uploaded analysis"):
+        try:
+            remove_run_directory(str(analysis["run_dir"]))
+        except (OSError, ValueError):
+            pass
+        st.session_state.pop(ANALYSIS_STATE_KEY, None)
+        st.session_state[UPLOADER_VERSION_KEY] = (
+            st.session_state.get(UPLOADER_VERSION_KEY, 0) + 1
+        )
+        st.rerun()
+
+
+def _counts_dataframe(values: dict[str, int], label: str) -> pd.DataFrame:
+    return pd.DataFrame(
+        [{label: name, "Count": count} for name, count in sorted(values.items())]
+    )
+
+
+st.title("🚦 FlowSense")
+st.caption("AI-Powered Traffic Flow Analysis and Short-Term Motion Prediction")
+
+project_results_tab, upload_tab = st.tabs(
+    ["Project Results", "Analyze Your Video"]
 )
+with project_results_tab:
+    render_project_results()
+with upload_tab:
+    render_upload_analysis()

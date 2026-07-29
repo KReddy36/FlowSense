@@ -22,3 +22,8 @@ MP4 and HTML report by default. Both are test-only.
 `test_motion_prediction.py` verifies bounded rolling histories, velocity
 smoothing, prediction through missed detections, and inactive-track deletion.
 Like the rest of this directory, it is test-only.
+
+`test_dashboard_uploads.py` verifies MP4 validation, isolated temporary run
+directories, cleanup, fake-detector analysis, and downloadable CSV packaging.
+`test_dashboard_smoke.py` confirms the saved-results and upload tabs render
+without loading YOLO. `test_video_compat.py` verifies H.264 conversion.

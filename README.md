@@ -134,7 +134,32 @@ python -m pip install -r requirements.txt
 python -m streamlit run Dashboard.py
 ```
 
-## Analyze a new video
+## Analyze your own video
+
+Launch the same dashboard used for the saved project results:
+
+```bash
+python3 -m streamlit run Dashboard.py
+```
+
+Open the **Analyze Your Video** tab, select one MP4 up to 100 MB, and click
+**Analyze video**. FlowSense stores the upload in an isolated temporary run
+directory and uses the existing end-to-end pipeline; it never writes uploaded
+files or results into the repository's validated `easy_results/`,
+`tracking_data/`, or `videos/` folders.
+
+Processing may take several minutes on a CPU. When it finishes, the dashboard
+shows the browser-compatible annotated video, processed-frame and tracking-ID
+totals, class and direction counts, and download buttons for the annotated
+MP4, HTML report, and analysis CSVs. The YOLO model is cached after its first
+load, so later analyses do not reload it. Use **Clear uploaded analysis** when
+finished; abandoned temporary runs are also removed automatically.
+
+The first analysis may download the pretrained `yolo11n.pt` weights and
+therefore requires an internet connection. No API key or paid service is
+required.
+
+## Analyze a new video from the command line
 
 After installing the dependencies, run the complete pipeline from the
 repository root:
