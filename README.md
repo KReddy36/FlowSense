@@ -1,334 +1,306 @@
-# FlowSense: AI-Powered Traffic Flow Analysis
+# FlowSense
 
-FlowSense uses pretrained YOLO detections and ByteTrack to identify, track, and
-analyze vehicles and pedestrians in prerecorded traffic footage.
+**AI-powered traffic detection, tracking, motion prediction, counting, and visualization from prerecorded video**
 
-## One-command pipeline
+[![Tests](https://github.com/KReddy36/FlowSense/actions/workflows/tests.yml/badge.svg)](https://github.com/KReddy36/FlowSense/actions/workflows/tests.yml)
 
-The normal workflow now accepts a video directly and runs every stage:
+FlowSense turns traffic footage into an annotated video and a traffic-analysis
+report. It uses a pretrained YOLO model to detect road users, ByteTrack plus
+identity-consolidation logic to follow them across frames, short-term motion
+prediction to estimate where they are moving, and an automatic counter to
+summarize traffic by class, direction, and time interval.
 
-```text
-input video
-  -> YOLO road-user detection
-  -> ByteTrack and identity consolidation
-  -> trajectory smoothing and short-term prediction
-  -> retrospective prediction-accuracy scoring
-  -> automatic traffic counting
-  -> annotated video and standalone HTML report
+The repository also includes a Streamlit dashboard with the team's four
+precomputed videos, manual-versus-automatic comparisons, class breakdowns,
+direction charts, and traffic-volume graphs.
+
+## What FlowSense does
+
+The complete pipeline is:
+
+**Video → YOLO detection → ByteTrack → identity consolidation → motion
+prediction → prediction evaluation → traffic counting → annotated video and
+HTML report**
+
+Main features:
+
+- Detects cars, trucks, buses, motorcycles, bicycles, and pedestrians.
+- Assigns and stabilizes object identities across video frames.
+- Suppresses duplicate tracks and reconnects short tracking gaps.
+- Predicts object centers 15 frames into the future.
+- Scores eligible predictions against later observed positions.
+- Excludes stationary objects and counts moving road users.
+- Switches to passage-line counting when tracking is severely fragmented.
+- Produces class totals, direction totals, and five-second traffic volumes.
+- Compares automatic vehicle counts with manual reference counts.
+- Presents saved results in an interactive local dashboard.
+- Processes a new traffic video from start to finish with one command.
+
+## Results
+
+Videos 1–3 were used as development data. Video 4 was reserved as the
+evaluation video.
+
+| Video | Role | Manual vehicles | FlowSense vehicles | Difference |
+| --- | --- | ---: | ---: | ---: |
+| Video 1 | Development | 8 | 6 | -2 |
+| Video 2 | Development | 72 | 77 | +5 |
+| Video 3 | Development | 51 | 47 | -4 |
+| Video 4 | Evaluation | 239 | 264 | +25 |
+
+`Difference` means automatic count minus manual count. On the held-out
+evaluation video, FlowSense overcounted by 25 vehicles, corresponding to
+approximately **89.5% total-count agreement**. This is an aggregate count
+comparison, not object-detection accuracy.
+
+### Motion-prediction evaluation
+
+The predictor was evaluated by comparing each predicted center with the same
+canonical track's observed center 15 frames later. A stationary baseline
+assumed that the object would remain at its current location.
+
+| Metric across all four videos | Result |
+| --- | ---: |
+| Eligible prediction samples | 61,388 |
+| Median prediction error | 10.012 px |
+| Median stationary-baseline error | 34.790 px |
+| Reduction in median error | 71.22% |
+| Samples where prediction beat the baseline | 83.36% |
+
+The predictor did not outperform the stationary baseline on Video 1, where
+many objects moved very little. See
+[PREDICTION_EVALUATION.md](PREDICTION_EVALUATION.md) for the per-video table,
+methodology, and limitations.
+
+## Open the dashboard
+
+The dashboard uses the precomputed files already stored in `easy_results/`.
+You do **not** need to rerun YOLO or process the videos before opening it.
+
+### macOS
+
+1. On GitHub, select **Code → Download ZIP**.
+2. Expand the ZIP. The example below assumes the folder is named
+   `FlowSense-main` and is on the Desktop.
+3. Open Terminal and run:
+
+```bash
+cd ~/Desktop/FlowSense-main
+python3 -m pip install -r requirements.txt
+python3 -m streamlit run Dashboard.py
 ```
 
-Install the project once:
+Streamlit should open the dashboard automatically. If it does not, open
+[http://localhost:8501](http://localhost:8501) in a browser.
+
+If the folder is somewhere else, type `cd ` with a space, drag the expanded
+FlowSense folder into Terminal, and press Return. Then run the remaining two
+commands.
+
+### Windows
+
+Open PowerShell or Command Prompt inside the expanded repository folder and
+run:
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+py -m pip install -r requirements.txt
+py -m streamlit run Dashboard.py
 ```
 
-Then analyze any video with one command:
+The dashboard is served from `localhost`, so each user runs a private copy on
+their own computer. Keep the terminal window open while using it. Press
+`Control+C` in the terminal to stop the dashboard.
 
-```powershell
-.\.venv\Scripts\python.exe run_flowsense.py "path\to\traffic_video.mp4"
-```
+### Optional virtual environment
 
-The default `results/` directory contains only:
-
-- `<video-name>_flowsense.mp4` — boxes, canonical IDs, observed trajectories,
-  and dashed short-term predictions.
-- `<video-name>_report.html` — Member 3's traffic-count report.
-
-The first real YOLO run downloads the pretrained `yolo11n.pt` weights if they
-are not already available. Intermediate detection, canonical-track, motion,
-and counting CSV files are created in a temporary workspace and removed
-automatically. To retain them for debugging, add `--keep-intermediates`.
-
-Useful options:
-
-```powershell
-# Quick five-frame integration check
-.\.venv\Scripts\python.exe run_flowsense.py video.mp4 --max-frames 5
-
-# Use a GPU and custom output folder
-.\.venv\Scripts\python.exe run_flowsense.py video.mp4 `
-  --device 0 `
-  --output-dir my_results
-
-# Replace an existing result pair
-.\.venv\Scripts\python.exe run_flowsense.py video.mp4 --overwrite
-```
-
-Run `python run_flowsense.py --help` for detection, prediction, and counting
-settings. Existing CSV-based commands remain available below for reproducing
-the original member-by-member datasets.
-
-The unified command connects the team's production stages directly. The
-original member-by-member scripts and datasets remain in the repository as
-legacy reproduction tools.
-
-## Motion prediction
-
-The tracking pipeline maintains a bounded rolling center-point history for
-each active canonical track. It averages recent point-to-point velocities to
-reduce detection jitter, keeps predicting temporarily missing tracks, and
-removes prediction state after a configurable inactivity timeout.
-
-Observed trajectories are solid in the annotated video. Short-term linear
-predictions are dashed and end in an outlined marker.
-
-Each one-command run also scores its eligible predictions after the video has
-finished processing. The HTML report's prediction accuracy is the percentage
-of forecasts that are closer to the later observed track position than the
-stationary ("vehicle stays in place") baseline. If a short clip has too few
-eligible future observations, the report displays `N/A`.
-
-### Measured prediction accuracy
-
-Run the reproducible evaluation:
-
-```powershell
-.\.venv\Scripts\python.exe evaluate_motion_prediction.py
-```
-
-It compares the actual `MotionPredictor` output with the same canonical track's
-observed center 15 frames later. The baseline assumes the object stays at its
-current center. Across the four repository videos, the measured median error is
-10.012 pixels versus 34.79 pixels for the stationary baseline, a 71.22%
-reduction in median error. The predictor wins on 83.36% of 61,388 eligible
-samples.
-
-See `PREDICTION_EVALUATION.md` for methodology, per-video results, and
-limitations. The full numeric table is
-`easy_results/prediction_accuracy.csv`.
-
-Run a short prediction preview:
-
-```powershell
-python track_member1_video.py `
-    --dataset 1 `
-    --max-frames 300 `
-    --history-points 30 `
-    --velocity-window 5 `
-    --prediction-horizon 15 `
-    --inactive-timeout 30
-```
-
-The full frame-by-frame motion history is streamed to
-`outputs/member2_motion_predictions.csv`; it is not retained in memory. Use
-`--motion-output PATH` to choose another file or `--no-motion-output` to
-disable it. The existing canonical track CSV format remains unchanged.
-
-The motion CSV contains one row per active track per frame:
-
-```text
-frame,time_seconds,track_id,class_id,class_name,is_observed,
-frames_since_seen,estimated_center_x,estimated_center_y,
-velocity_x_pixels_per_second,velocity_y_pixels_per_second,
-speed_pixels_per_second,direction_degrees,prediction_horizon_frames,
-predicted_frame,predicted_time_seconds,predicted_center_x,predicted_center_y
-```
-
-`is_observed=0` means the row is a temporary estimate during a missed
-detection. Statistics and dashboard code can join this file to the canonical
-CSV using `frame` and `track_id`.
-
-## Repository inputs and outputs
-
-Required inputs:
-
-```text
-tracking_data/tracking_data.csv
-tracking_data/tracking_data2.csv
-tracking_data/tracking_data3.csv
-tracking_data/tracking_data4.csv
-videos/source_traffic.mp4
-videos/flowsense_tracking2.mp4
-videos/flowsense_tracking3.mp4
-videos/flowsense_tracking4*.mp4
-```
-
-Generated outputs:
-
-```text
-outputs/member2_bytetrack_overlay.mp4
-outputs/member2_canonical_tracks.csv
-outputs/member2_bytetrack_overlay2.mp4
-outputs/member2_canonical_tracks2.csv
-...
-```
-
-A preprocessed presentation fallback is committed as:
-
-```text
-videos/member2_bytetrack_overlay.mp4
-```
-
-## Environment setup
-
-Python 3.12 is recommended.
-
-### Windows PowerShell
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-```
-
-If PowerShell prevents virtual-environment activation:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\Activate.ps1
-```
-
-### macOS or Linux
+Using a virtual environment keeps FlowSense packages separate from other
+Python projects:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+python -m streamlit run Dashboard.py
 ```
 
-No API key or paid service is required.
-
-## Reproduce Member 2's results
-
-From the repository root:
+On Windows PowerShell, activate it with:
 
 ```powershell
-python track_member1_video.py
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python -m streamlit run Dashboard.py
 ```
 
-This processes dataset 1 by default. Select either additional pair with:
+## Analyze a new video
+
+After installing the dependencies, run the complete pipeline from the
+repository root:
+
+```bash
+python3 run_flowsense.py "/path/to/traffic_video.mp4"
+```
+
+Windows users can use:
 
 ```powershell
-python track_member1_video.py --dataset 2
-python track_member1_video.py --dataset 3
-python track_member1_video.py --dataset 4
+py run_flowsense.py "C:\path\to\traffic_video.mp4"
 ```
 
-Process all four sequentially with:
+The default `results/` folder will contain:
 
-```powershell
-python track_member1_video.py --dataset all
+- `<video-name>_flowsense.mp4` — detections, canonical IDs, observed
+  trajectories, and dashed short-term predictions.
+- `<video-name>_report.html` — traffic counts, a prediction-accuracy
+  percentage when enough forecasts are eligible, and analysis in a standalone
+  browser report.
+
+The first real run may download the pretrained `yolo11n.pt` weights and
+therefore requires an internet connection. No API key or paid service is
+required.
+
+Useful options:
+
+```bash
+# Process only five frames as a quick integration check
+python3 run_flowsense.py video.mp4 --max-frames 5
+
+# Replace an existing output pair
+python3 run_flowsense.py video.mp4 --overwrite
+
+# Keep intermediate tracking, prediction, and counting files
+python3 run_flowsense.py video.mp4 --keep-intermediates
+
+# See every available setting
+python3 run_flowsense.py --help
 ```
 
-This processes all four dataset pairs. Each dataset writes to a different video
-and canonical CSV under `outputs/`, so
-the results do not overwrite each other. Custom paths are supported for a
-single selected dataset:
+## Reproduce the saved analyses
 
-```powershell
-python track_member1_video.py `
-    --dataset 1 `
-    --csv tracking_data/tracking_data.csv `
-    --video videos/source_traffic.mp4 `
-    --output outputs/member2_bytetrack_overlay.mp4 `
-    --tracks-output outputs/member2_canonical_tracks.csv
+The repository includes the canonical tracking CSVs used for the final
+evaluation, so these commands do not require a new YOLO run.
+
+Regenerate the automatic-count reports:
+
+```bash
+python3 automatic_counter.py \
+  --manual-counts kelvin_vehicle_counts.csv \
+  --evaluation-video "Video 4"
 ```
 
-To generate canonical CSV data without decoding or writing an overlaid video:
+Regenerate the motion-prediction evaluation:
 
-```powershell
-python track_member1_video.py --dataset 4 --no-video
-python track_member1_video.py --dataset all --no-video
+```bash
+python3 evaluate_motion_prediction.py
 ```
 
-`--no-video` is the faster option for analytics workflows that only need the
-canonical track records.
+The main saved outputs are in `easy_results/`:
 
-For dataset 4, the program accepts the canonical `flowsense_tracking4.mp4`
-filename or a single browser-uploaded variant such as
-`flowsense_tracking4 (1) (1) (1).mp4`.
+| File | Purpose |
+| --- | --- |
+| `FlowSense_report.html` | Standalone traffic-analysis report |
+| `automatic_counts.csv` | Automatic totals by video, class, and direction |
+| `comparison_by_video.csv` | Manual-versus-automatic vehicle totals |
+| `comparison_by_video_class.csv` | Class-level comparison |
+| `traffic_volume_intervals.csv` | Five-second traffic volumes |
+| `object_movement_audit.csv` | Counted/excluded decision for each track |
+| `prediction_accuracy.csv` | Motion-prediction evaluation |
+| `summary.json` | Machine-readable settings and results |
 
-For a short development check:
+For counter-specific options and file formats, see
+[README_automatic_counter.md](README_automatic_counter.md).
 
-```powershell
-python track_member1_video.py `
-    --max-frames 50 `
-    --output outputs/preview.mp4 `
-    --tracks-output outputs/preview_tracks.csv
+## Run the tests
+
+Install the dependencies, then run:
+
+```bash
+python3 -m unittest discover -v
 ```
 
-## Detection input contract
+The same test suite runs automatically through GitHub Actions on pushes and
+pull requests. It covers detection conversion, tracking, identity
+consolidation, motion prediction, counting, prediction evaluation, and the
+end-to-end pipeline.
 
-The detection CSV must contain:
+## Team
 
-```text
-frame,time_seconds,class_name,confidence,x1,y1,x2,y2
-```
+| Team member | Primary contribution |
+| --- | --- |
+| **Batuhan Akbas** | YOLO detection foundation, initial detection/tracking notebook, traffic-video datasets, and project coordination |
+| **Kellan Reddy** | ByteTrack pipeline, identity consolidation, motion prediction and evaluation, end-to-end pipeline, testing, and repository integration |
+| **Brayden Chen** | Automatic traffic counter, hybrid movement/passage logic, generated reports, comparisons, and counter tests |
+| **Kelvin Qian** | Manual reference counts, result comparison, Streamlit dashboard, and visualization |
 
-Additional columns are allowed. Member 1's existing `track_id`, `center_x`, and
-`center_y` columns are accepted but are not used as tracker input. Member 2's
-pipeline assigns its own IDs.
+FlowSense is an integrated team project: each stage consumes the output of the
+previous stage, and the dashboard presents the combined results.
 
-Supported pretrained COCO classes are:
+## Repository guide
 
-```text
-person, bicycle, car, motorcycle, bus, truck
-```
+| Path | Description |
+| --- | --- |
+| `run_flowsense.py` | One-command entry point for a new video |
+| `Dashboard.py` | Streamlit dashboard for the four saved analyses |
+| `automatic_counter.py` | Automatic traffic counting and report generation |
+| `evaluate_motion_prediction.py` | Prediction-versus-baseline evaluation |
+| `flowsense/` | Detection, tracking, prediction, rendering, and orchestration code |
+| `tracking_data/` | Detection and canonical-track CSVs for four videos |
+| `videos/` | Source and annotated demonstration videos |
+| `easy_results/` | Reproducible result snapshot used by the dashboard |
+| `tests/` | Automated regression and integration tests |
+| `FILE_MANIFEST.md` | Complete description of production, data, and test files |
 
-All bounding-box values use source-video pixel coordinates.
+## Methods
 
-## Canonical tracking output
+### Detection and tracking
 
-`member2_canonical_tracks.csv` contains one visible canonical object per frame:
+FlowSense uses a pretrained Ultralytics YOLO model for road-user detections and
+ByteTrack for frame-to-frame association. A custom consolidation layer merges
+duplicate detections, reconnects short gaps using predicted positions, avoids
+merging two established nearby vehicles, and stabilizes temporary class
+changes.
 
-```text
-frame,time_seconds,track_id,class_id,class_name,confidence,
-center_x,center_y,x1,y1,x2,y2
-```
+### Motion prediction
 
-Member 3 can read this file directly for unique counts, class distributions,
-density, direction, and trajectory statistics. Member 4 can use the annotated
-video as a dashboard input or import the Python modules for live processing.
-Datasets 2–4 use the corresponding numbered names, such as
-`member2_canonical_tracks4.csv`.
+For each active canonical track, FlowSense stores a bounded history of center
+points. It averages recent frame-to-frame velocities and projects the center
+forward by 15 frames. Observed trajectories are rendered as solid lines;
+predicted motion is rendered as a dashed line ending in an outlined marker.
 
-Precomputed canonical CSVs for all four datasets are also committed under
-`tracking_data/` so the analytics and dashboard components can work without
-rerunning ByteTrack.
+### Traffic counting
 
-## Identity consolidation
+The counter normally counts each moving canonical identity once and excludes
+tracks whose total movement is below 50 pixels. If the rate of fragmented IDs
+is unusually high, automatic mode switches to horizontal passage-line
+counting. Video 4 remained held out while the counting settings were selected
+using Videos 1–3.
 
-After ByteTrack assigns raw identities, the consolidation layer:
+## Limitations
 
-- merges strongly overlapping detections under one canonical ID;
-- hides all but the highest-confidence duplicate in a frame;
-- reconnects new raw IDs to recently missing objects using predicted position;
-- refuses to merge two established identities solely because their boxes
-  overlap;
-- splits a mistaken reidentification when two spatially separate vehicles
-  later appear in the same frame;
-- preserves one ID and color across those matches; and
-- stabilizes brief class changes using accumulated confidence.
+- FlowSense was evaluated on four prerecorded, fixed-camera videos; the
+  results do not establish performance across all roads, cameras, weather, or
+  lighting conditions.
+- Occlusion, crowded scenes, and long detection gaps can split one vehicle
+  into multiple identities and cause overcounting.
+- Distant or partially hidden vehicles can be assigned the wrong class.
+- The held-out Video 4 result overcounted by 25 vehicles, showing that identity
+  fragmentation remains a meaningful limitation.
+- The manual counts are an approximate human benchmark, not frame-by-frame
+  object annotations.
+- Motion and prediction values are measured in image pixels. They are not
+  calibrated real-world positions or speeds.
+- The predictor is a short-term constant-velocity model and can perform poorly
+  for nearly stationary or abruptly turning objects.
+- FlowSense analyzes prerecorded footage; it is not currently a live traffic
+  control or safety system.
 
-The default thresholds are defined in
-`flowsense/tracking/identity_consolidator.py`.
+## Requirements and license
 
-## Development tests
-
-The following command verifies CSV loading, ByteTrack ID stability, duplicate
-suppression, short-gap reconnection, and protection against merging separate
-objects:
-
-```powershell
-python -m unittest discover -s tests -v
-```
-
-Files under `tests/`, `demo_day1.py`, and
-`flowsense/tracking/verification.py` are clearly marked **TEST-ONLY**. Keep them
-through team integration and regression testing, but exclude them from the
-final deployed application if the submission requires runtime files only.
-
-See `FILE_MANIFEST.md` for the complete production/test-only distinction.
-
-## Known limitations
-
-- Identity consolidation uses spatial and motion heuristics rather than visual
-  appearance embeddings.
-- Pixel motion depends on the fixed camera view and is not real-world speed.
-- Heavy occlusion or long detection gaps can still create new identities.
-- Very long, complete occlusions can still make two visually similar vehicles
-  difficult to distinguish without appearance embeddings.
+- Python 3.12 is recommended.
+- Dependencies are listed in `requirements.txt`.
+- A real YOLO run can be compute-intensive and may be slow without a supported
+  GPU.
+- The project is licensed under the
+  [GNU Affero General Public License v3.0](LICENSE).

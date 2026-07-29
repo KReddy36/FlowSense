@@ -93,7 +93,7 @@ def parse_args() -> argparse.Namespace:
         "--counting-mode",
         choices=("auto", "movement", "passage"),
         default="auto",
-        help="Member 3 counting strategy (default: auto).",
+        help="Traffic counting strategy (default: auto).",
     )
     parser.add_argument(
         "--max-frames",
