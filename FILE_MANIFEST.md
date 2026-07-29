@@ -19,6 +19,8 @@ development-only verification files.
 - `flowsense/yolo_detector.py` — in-memory Ultralytics YOLO adapter
 - `flowsense/csv_detections.py` — legacy detection CSV loader
 - `flowsense/prediction_evaluation.py` — measured future-position evaluation
+- `flowsense/dashboard_uploads.py` — secure upload lifecycle and downloads
+- `flowsense/video_compat.py` — browser-compatible H.264 conversion
 - `flowsense/tracking/__init__.py`
 - `flowsense/tracking/bytetrack_tracker.py`
 - `flowsense/tracking/identity_consolidator.py`
@@ -105,10 +107,13 @@ runtime-only submission:
 - `tests/test_csv_detections.py`
 - `tests/test_dataset_configs.py`
 - `tests/test_day1_tracking.py`
+- `tests/test_dashboard_smoke.py`
+- `tests/test_dashboard_uploads.py`
 - `tests/test_end_to_end_pipeline.py`
 - `tests/test_identity_consolidator.py`
 - `tests/test_motion_prediction.py`
 - `tests/test_prediction_evaluation.py`
+- `tests/test_video_compat.py`
 - `tests/test_yolo_detector.py`
 - `.github/workflows/tests.yml` — automated test workflow
 

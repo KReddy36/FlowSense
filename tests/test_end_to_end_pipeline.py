@@ -5,12 +5,14 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import cv2
 import numpy as np
 
 from flowsense.pipeline import PipelineConfig, run_pipeline
 from flowsense.tracking import Detection
+from flowsense.video_compat import VideoConversionError
 
 
 class _MovingCarDetector:
@@ -60,6 +62,7 @@ class EndToEndPipelineTests(unittest.TestCase):
             input_video = root / "intersection.mp4"
             output_dir = root / "results"
             _write_test_video(input_video)
+            progress: list[tuple[int, int]] = []
 
             result = run_pipeline(
                 PipelineConfig(
@@ -68,6 +71,9 @@ class EndToEndPipelineTests(unittest.TestCase):
                     movement_threshold_pixels=1.0,
                 ),
                 detector=_MovingCarDetector(),
+                progress_callback=lambda processed, total: progress.append(
+                    (processed, total)
+                ),
             )
 
             self.assertTrue(result.output_video.is_file())
@@ -82,6 +88,10 @@ class EndToEndPipelineTests(unittest.TestCase):
             self.assertEqual(result.prediction_accuracy_samples, 0)
             self.assertIn("Prediction accuracy", report)
             self.assertIn("N/A", report)
+            self.assertTrue(result.browser_compatible_video)
+            self.assertIsNone(result.video_preview_warning)
+            self.assertEqual(progress[0], (0, 8))
+            self.assertEqual(progress[-1], (8, 8))
             self.assertIsNone(result.intermediate_dir)
             self.assertEqual(
                 sorted(path.name for path in output_dir.iterdir()),
@@ -150,6 +160,56 @@ class EndToEndPipelineTests(unittest.TestCase):
                     / "automatic_counts.csv"
                 ).is_file()
             )
+
+    def test_h264_failure_retains_original_annotated_video(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            input_video = root / "intersection.mp4"
+            output_dir = root / "results"
+            _write_test_video(input_video)
+
+            with patch(
+                "flowsense.pipeline.convert_to_browser_mp4",
+                side_effect=VideoConversionError("converter unavailable"),
+            ):
+                result = run_pipeline(
+                    PipelineConfig(
+                        input_video=input_video,
+                        output_dir=output_dir,
+                        movement_threshold_pixels=1.0,
+                    ),
+                    detector=_MovingCarDetector(),
+                )
+
+            self.assertTrue(result.output_video.is_file())
+            self.assertFalse(result.browser_compatible_video)
+            self.assertIn(
+                "still available to download",
+                result.video_preview_warning or "",
+            )
+
+    def test_progress_callback_failure_does_not_stop_pipeline(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            input_video = root / "intersection.mp4"
+            output_dir = root / "results"
+            _write_test_video(input_video)
+
+            def broken_progress(_processed: int, _total: int) -> None:
+                raise RuntimeError("test callback failure")
+
+            result = run_pipeline(
+                PipelineConfig(
+                    input_video=input_video,
+                    output_dir=output_dir,
+                    movement_threshold_pixels=1.0,
+                ),
+                detector=_MovingCarDetector(),
+                progress_callback=broken_progress,
+            )
+
+            self.assertTrue(result.output_video.is_file())
+            self.assertTrue(result.output_report.is_file())
 
 
 if __name__ == "__main__":

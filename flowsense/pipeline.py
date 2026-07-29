@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import shutil
 import tempfile
+from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,6 +19,7 @@ from .prediction_evaluation import evaluate_tracking_csv, summarize_errors
 from .tracking import ByteTrackTracker, IdentityConsolidator, MotionPredictor
 from .tracking.render import render_motion_paths, render_tracking_ids
 from .tracking.schemas import Detection
+from .video_compat import VideoConversionError, convert_to_browser_mp4
 from .yolo_detector import YoloDetector
 
 
@@ -55,6 +57,7 @@ MOTION_COLUMNS = (
     "predicted_center_x",
     "predicted_center_y",
 )
+ProgressCallback = Callable[[int, int], None]
 
 
 class FrameDetector(Protocol):
@@ -99,6 +102,8 @@ class PipelineResult:
 
     output_video: Path
     output_report: Path
+    browser_compatible_video: bool
+    video_preview_warning: str | None
     processed_frames: int
     detected_instances: int
     rendered_track_instances: int
@@ -115,6 +120,7 @@ def run_pipeline(
     config: PipelineConfig,
     *,
     detector: FrameDetector | None = None,
+    progress_callback: ProgressCallback | None = None,
 ) -> PipelineResult:
     """Run detection, tracking, prediction, counting, and report generation."""
     _validate_config(config)
@@ -152,6 +158,7 @@ def run_pipeline(
     with workspace_context as workspace_value:
         workspace = Path(workspace_value)
         staged_video = workspace / "annotated_video.mp4"
+        browser_video = workspace / "annotated_video_h264.mp4"
         canonical_tracks = workspace / "canonical_tracks.csv"
         motion_history = (
             workspace / "motion_predictions.csv"
@@ -166,6 +173,7 @@ def run_pipeline(
             canonical_tracks,
             motion_history,
             detector=detector,
+            progress_callback=progress_callback,
         )
         if summary["rendered_track_instances"] == 0:
             raise RuntimeError(
@@ -210,7 +218,24 @@ def run_pipeline(
         if not staged_report.is_file():
             raise RuntimeError("The counting stage did not create its HTML report")
 
-        _publish_artifact(staged_video, final_video, config.overwrite)
+        browser_compatible_video = True
+        video_preview_warning: str | None = None
+        video_to_publish = staged_video
+        try:
+            video_to_publish = convert_to_browser_mp4(
+                staged_video,
+                browser_video,
+            )
+            staged_video.unlink(missing_ok=True)
+        except VideoConversionError as exc:
+            browser_compatible_video = False
+            video_preview_warning = (
+                "Browser-compatible H.264 conversion was unavailable. "
+                "The original annotated MP4 is still available to download. "
+                f"{exc}"
+            )
+
+        _publish_artifact(video_to_publish, final_video, config.overwrite)
         _publish_artifact(staged_report, final_report, config.overwrite)
 
         combined = count_summary["combined"]
@@ -219,6 +244,8 @@ def run_pipeline(
         return PipelineResult(
             output_video=final_video,
             output_report=final_report,
+            browser_compatible_video=browser_compatible_video,
+            video_preview_warning=video_preview_warning,
             processed_frames=int(summary["processed_frames"]),
             detected_instances=int(summary["detected_instances"]),
             rendered_track_instances=int(summary["rendered_track_instances"]),
@@ -250,6 +277,7 @@ def _process_video(
     motion_history: Path | None,
     *,
     detector: FrameDetector | None,
+    progress_callback: ProgressCallback | None,
 ) -> dict[str, int]:
     try:
         import cv2
@@ -274,6 +302,14 @@ def _process_video(
     if width <= 0 or height <= 0 or fps <= 0:
         capture.release()
         raise RuntimeError("Input video has invalid width, height, or frame rate")
+    progress_total = max(0, total_frames)
+    if config.maximum_frames is not None and progress_total > 0:
+        progress_total = min(progress_total, config.maximum_frames)
+    active_progress_callback = _notify_progress(
+        progress_callback,
+        processed_frames=0,
+        total_frames=progress_total,
+    )
 
     writer = cv2.VideoWriter(
         str(staged_video),
@@ -424,6 +460,11 @@ def _process_video(
                 )
                 writer.write(annotated)
                 processed_frames += 1
+                active_progress_callback = _notify_progress(
+                    active_progress_callback,
+                    processed_frames=processed_frames,
+                    total_frames=max(progress_total, processed_frames),
+                )
                 if processed_frames % 100 == 0:
                     print(
                         f"Processed {processed_frames}/{total_frames} frames"
@@ -498,3 +539,20 @@ def _publish_artifact(source: Path, destination: Path, overwrite: bool) -> None:
             raise FileExistsError(f"Output already exists: {destination}")
         destination.unlink()
     shutil.move(str(source), str(destination))
+
+
+def _notify_progress(
+    callback: ProgressCallback | None,
+    *,
+    processed_frames: int,
+    total_frames: int,
+) -> ProgressCallback | None:
+    """Call progress reporting without allowing UI failures to stop analysis."""
+    if callback is None:
+        return None
+    try:
+        callback(processed_frames, total_frames)
+    except Exception as exc:
+        print(f"Progress reporting disabled: {exc}")
+        return None
+    return callback
