@@ -36,7 +36,7 @@ BASE_REQUIRED_COLUMNS = {
     "center_y",
 }
 ID_COLUMNS = ("canonical_id", "track_id")
-PROGRAM_VERSION = "hybrid-v6.2"
+PROGRAM_VERSION = "hybrid-v6.3"
 CLASS_NAMES = {
     "person": "Pedestrian",
     "pedestrian": "Pedestrian",
@@ -67,6 +67,8 @@ VEHICLE_CLASSES = {
     "Bus",
     "Van",
 }
+PASSAGE_MINIMUM_CROSSINGS = 5
+PASSAGE_MINIMUM_MOVING_COVERAGE = 0.25
 
 
 @dataclass(frozen=True)
@@ -107,6 +109,16 @@ class TrackResult:
     counted: bool
     direction: str
     mean_confidence: float | None
+
+
+@dataclass(frozen=True)
+class PassageViability:
+    """Evidence that a proposed line represents enough moving traffic."""
+
+    moving_vehicle_candidates: int
+    crossing_candidates: int
+    crossing_ratio: float
+    viable: bool
 
 
 def parse_args() -> argparse.Namespace:
@@ -166,7 +178,8 @@ def parse_args() -> argparse.Namespace:
         choices=("auto", "movement", "passage"),
         default="auto",
         help=(
-            "auto uses passage counting only for heavily fragmented videos "
+            "auto tests passage counting for heavily fragmented videos and "
+            "uses it only when the line captures representative traffic "
             "(default: auto)"
         ),
     )
@@ -600,6 +613,46 @@ def choose_counting_method(
             else "movement"
         )
     return requested_mode
+
+
+def evaluate_passage_viability(
+    detections: Iterable[Detection],
+    movement_results: Iterable[TrackResult],
+    *,
+    line_y: float,
+    hysteresis_pixels: float,
+    minimum_crossings: int = PASSAGE_MINIMUM_CROSSINGS,
+    minimum_moving_coverage: float = PASSAGE_MINIMUM_MOVING_COVERAGE,
+) -> PassageViability:
+    """Return whether a proposed line captures representative moving traffic."""
+    moving_vehicle_ids = {
+        result.canonical_id
+        for result in movement_results
+        if result.counted and result.class_name in VEHICLE_CLASSES
+    }
+    grouped: dict[str, list[Detection]] = defaultdict(list)
+    for detection in detections:
+        if detection.canonical_id in moving_vehicle_ids:
+            grouped[detection.canonical_id].append(detection)
+
+    crossings = 0
+    for rows in grouped.values():
+        rows.sort(key=lambda item: (item.time_seconds, item.frame))
+        if find_horizontal_passage(rows, line_y, hysteresis_pixels) is not None:
+            crossings += 1
+    moving_candidates = len(moving_vehicle_ids)
+    crossing_ratio = (
+        crossings / moving_candidates if moving_candidates else 0.0
+    )
+    return PassageViability(
+        moving_vehicle_candidates=moving_candidates,
+        crossing_candidates=crossings,
+        crossing_ratio=crossing_ratio,
+        viable=(
+            crossings >= minimum_crossings
+            and crossing_ratio >= minimum_moving_coverage
+        ),
+    )
 
 
 def analyze_tracks(
@@ -1121,6 +1174,9 @@ def write_html_report(
                 </div>
                 <span class="threshold">{html.escape(method_label)}</span>
               </div>
+              <p class="interpretation"><strong>Automatic method decision:</strong>
+                {html.escape(str(settings.get('counting_decision', '')))}
+              </p>
               <div class="metrics">
                 <div class="metric primary"><strong>{len(moving)}</strong><span>Moving objects counted</span></div>
                 <div class="metric primary"><strong>{sum(class_counts[name] for name in VEHICLE_CLASSES)}</strong><span>Vehicles counted</span></div>
@@ -1738,7 +1794,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
             )
         detections, id_column = load_detections(path)
         fragmentation_rate = vehicle_id_rate_per_minute(detections)
-        selected_counting_method = choose_counting_method(
+        preliminary_counting_method = choose_counting_method(
             requested_counting_mode,
             fragmentation_rate,
             args.fragmentation_ids_per_minute,
@@ -1751,23 +1807,91 @@ def run(args: argparse.Namespace) -> dict[str, object]:
             )
             for row in detections
         )
-        passage_line_y = (
+        candidate_passage_line_y = (
             frame_height * passage_fraction
+            if preliminary_counting_method == "passage"
+            else None
+        )
+        viability: PassageViability | None = None
+        movement_results: list[TrackResult] | None = None
+        if (
+            requested_counting_mode == "auto"
+            and preliminary_counting_method == "passage"
+            and candidate_passage_line_y is not None
+        ):
+            movement_results = analyze_tracks(
+                detections=detections,
+                video=video,
+                source_csv=path,
+                movement_threshold=threshold,
+                toward=toward,
+                cross_traffic_ratio=args.cross_traffic_ratio,
+                min_track_frames=args.min_track_frames,
+                counting_method="movement",
+                passage_line_y=None,
+                passage_hysteresis_pixels=args.passage_hysteresis_pixels,
+            )
+            viability = evaluate_passage_viability(
+                detections,
+                movement_results,
+                line_y=candidate_passage_line_y,
+                hysteresis_pixels=args.passage_hysteresis_pixels,
+            )
+        selected_counting_method = (
+            "movement"
+            if viability is not None and not viability.viable
+            else preliminary_counting_method
+        )
+        if viability is not None:
+            coverage_percent = viability.crossing_ratio * 100.0
+            counting_decision = (
+                "Passage counting selected: high ID rate and "
+                f"{viability.crossing_candidates} of "
+                f"{viability.moving_vehicle_candidates} moving vehicle "
+                f"candidates ({coverage_percent:.1f}%) crossed the line."
+                if viability.viable
+                else (
+                    "Movement counting fallback: the high ID rate suggested "
+                    "fragmentation, but only "
+                    f"{viability.crossing_candidates} of "
+                    f"{viability.moving_vehicle_candidates} moving vehicle "
+                    f"candidates ({coverage_percent:.1f}%) crossed the "
+                    "proposed line."
+                )
+            )
+        elif requested_counting_mode == "auto":
+            counting_decision = (
+                "Movement counting selected: the vehicle-ID rate did not "
+                "reach the fragmentation threshold."
+            )
+        else:
+            counting_decision = (
+                f"{selected_counting_method.title()} counting was explicitly "
+                "requested."
+            )
+        passage_line_y = (
+            candidate_passage_line_y
             if selected_counting_method == "passage"
             else None
         )
-        results = analyze_tracks(
-            detections=detections,
-            video=video,
-            source_csv=path,
-            movement_threshold=threshold,
-            toward=toward,
-            cross_traffic_ratio=args.cross_traffic_ratio,
-            min_track_frames=args.min_track_frames,
-            counting_method=selected_counting_method,
-            passage_line_y=passage_line_y,
-            passage_hysteresis_pixels=args.passage_hysteresis_pixels,
-        )
+        if (
+            selected_counting_method == "movement"
+            and movement_results is not None
+        ):
+            results = movement_results
+        else:
+            results = analyze_tracks(
+                detections=detections,
+                video=video,
+                source_csv=path,
+                movement_threshold=threshold,
+                toward=toward,
+                cross_traffic_ratio=args.cross_traffic_ratio,
+                min_track_frames=args.min_track_frames,
+                counting_method=selected_counting_method,
+                passage_line_y=passage_line_y,
+                passage_hysteresis_pixels=args.passage_hysteresis_pixels,
+            )
         if (
             selected_counting_method == "passage"
             and not args.disable_passage_class_refinement
@@ -1796,7 +1920,34 @@ def run(args: argparse.Namespace) -> dict[str, object]:
             "toward_camera_image_direction": toward,
             "requested_counting_mode": requested_counting_mode,
             "selected_counting_method": selected_counting_method,
+            "counting_decision": counting_decision,
             "vehicle_ids_per_minute": round(fragmentation_rate, 3),
+            "passage_viability_checked": viability is not None,
+            "passage_candidate_moving_vehicles": (
+                viability.moving_vehicle_candidates
+                if viability is not None
+                else None
+            ),
+            "passage_candidate_crossings": (
+                viability.crossing_candidates
+                if viability is not None
+                else None
+            ),
+            "passage_candidate_crossing_ratio": (
+                round(viability.crossing_ratio, 4)
+                if viability is not None
+                else None
+            ),
+            "passage_minimum_crossings": (
+                PASSAGE_MINIMUM_CROSSINGS
+                if viability is not None
+                else None
+            ),
+            "passage_minimum_moving_coverage": (
+                PASSAGE_MINIMUM_MOVING_COVERAGE
+                if viability is not None
+                else None
+            ),
             "passage_line_fraction": (
                 passage_fraction
                 if selected_counting_method == "passage"
@@ -1961,9 +2112,10 @@ def run(args: argparse.Namespace) -> dict[str, object]:
     summary: dict[str, object] = {
         "method": (
             "Rows are grouped by canonical_id (or track_id fallback). Auto "
-            "mode uses one count per moving ID normally, but switches to one "
-            "count per horizontal passage-line crossing when vehicle-ID "
-            "fragmentation exceeds the configured rate."
+            "mode uses one count per moving ID normally. A high vehicle-ID "
+            "rate can select horizontal passage-line counting only when the "
+            "line also captures at least five and 25% of moving vehicle "
+            "candidates."
         ),
         "settings": {
             "program_version": PROGRAM_VERSION,
@@ -1972,6 +2124,10 @@ def run(args: argparse.Namespace) -> dict[str, object]:
             "default_passage_line_fraction": args.passage_line_fraction,
             "passage_hysteresis_pixels": args.passage_hysteresis_pixels,
             "fragmentation_ids_per_minute": args.fragmentation_ids_per_minute,
+            "passage_minimum_crossings": PASSAGE_MINIMUM_CROSSINGS,
+            "passage_minimum_moving_coverage": (
+                PASSAGE_MINIMUM_MOVING_COVERAGE
+            ),
             "passage_class_refinement": (
                 not args.disable_passage_class_refinement
             ),

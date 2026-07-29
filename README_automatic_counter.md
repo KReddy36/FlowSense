@@ -17,11 +17,18 @@ perform prediction.
 Later integration commits by another teammate do not change ownership of
 Brayden's automatic-counter component.
 
-Version `hybrid-v6.2` automatically detects severe ID fragmentation. Normal
-videos count each moving canonical ID once. A heavily fragmented video switches
-to counting objects once when they cross a consistent horizontal passage line.
-This prevents Video 2's short track fragments from being counted as separate
-vehicles.
+Version `hybrid-v6.3` automatically detects severe ID fragmentation. Normal
+videos count each moving canonical ID once. For a heavily fragmented video,
+the counter tests a consistent horizontal passage line before using it. Passage
+counting is selected only when the line captures at least five vehicles and at
+least 25% of the moving-vehicle candidates; otherwise the counter safely falls
+back to movement counting. This keeps the policy video-independent while
+preventing unsuitable line placement from severely undercounting uploaded
+footage.
+
+Video 2 naturally satisfies this rule: 77 of its 151 moving-vehicle candidates
+cross the passage line (about 51%). Its short track fragments therefore remain
+protected from being counted as separate vehicles.
 
 For a passage-counted video, nearby downstream non-car fragments can refine a
 crossing's class without adding another vehicle. This preserves the 77-vehicle
