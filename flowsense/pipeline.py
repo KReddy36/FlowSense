@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import shutil
 import tempfile
 from collections.abc import Callable
@@ -16,7 +17,13 @@ import numpy as np
 from automatic_counter import run_single_video_report
 
 from .prediction_evaluation import evaluate_tracking_csv, summarize_errors
-from .tracking import ByteTrackTracker, IdentityConsolidator, MotionPredictor
+from .tracking import (
+    ByteTrackTracker,
+    IdentityConsolidator,
+    LearnedMotionCorrector,
+    MotionPredictor,
+    default_model_path,
+)
 from .tracking.render import render_motion_paths, render_tracking_ids
 from .tracking.schemas import Detection
 from .video_compat import VideoConversionError, convert_to_browser_mp4
@@ -94,6 +101,8 @@ class PipelineConfig:
     maximum_frames: int | None = None
     keep_intermediates: bool = False
     overwrite: bool = False
+    use_learned_prediction: bool = True
+    learned_model_path: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -188,6 +197,9 @@ def run_pipeline(
             velocity_window=config.velocity_window,
             prediction_horizon_frames=config.prediction_horizon_frames,
             inactive_timeout_frames=config.inactive_timeout_frames,
+            learned_corrector=_load_learned_corrector(config),
+            frame_width=float(summary["frame_width"]),
+            frame_height=float(summary["frame_height"]),
         )
         prediction_accuracy_percent: float | None = None
         if prediction_errors:
@@ -323,12 +335,16 @@ def _process_video(
 
     tracker = ByteTrackTracker(frame_rate=max(1, round(fps)))
     consolidator = IdentityConsolidator()
+    learned_corrector = _load_learned_corrector(config)
     predictor = MotionPredictor(
         fps=fps,
         history_points=config.history_points,
         velocity_window=config.velocity_window,
         prediction_horizon_frames=config.prediction_horizon_frames,
         inactive_timeout_frames=config.inactive_timeout_frames,
+        frame_width=width,
+        frame_height=height,
+        learned_corrector=learned_corrector,
     )
     detected_instances = 0
     rendered_track_instances = 0
@@ -483,7 +499,38 @@ def _process_video(
         "rendered_track_instances": rendered_track_instances,
         "unique_track_ids": len(unique_track_ids),
         "suppressed_duplicate_instances": suppressed_duplicate_instances,
+        "frame_width": width,
+        "frame_height": height,
     }
+
+
+def _load_learned_corrector(
+    config: PipelineConfig,
+) -> LearnedMotionCorrector | None:
+    """Load the portable model, falling back safely to constant velocity."""
+    if not config.use_learned_prediction:
+        return None
+    path = config.learned_model_path or default_model_path()
+    try:
+        corrector = LearnedMotionCorrector.from_json(path)
+    except (OSError, TypeError, ValueError, KeyError, json.JSONDecodeError) as exc:
+        print(
+            "Learned prediction unavailable; using constant velocity instead: "
+            f"{exc}"
+        )
+        return None
+    if not corrector.compatible_with(
+        horizon_frames=config.prediction_horizon_frames,
+        velocity_window=config.velocity_window,
+    ):
+        print(
+            "Learned prediction was trained for "
+            f"{corrector.horizon_frames} frames and a "
+            f"{corrector.velocity_window}-velocity window; using constant "
+            "velocity for the requested settings."
+        )
+        return None
+    return corrector
 
 
 def _validate_config(config: PipelineConfig) -> None:
