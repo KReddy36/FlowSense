@@ -232,20 +232,20 @@ with comparison_right:
     st.dataframe(
         selected_class_comparison,
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
     )
 
 if role == "Evaluation":
     manual_total = float(selected_comparison["Kelvin vehicles"])
     automatic_total = float(selected_comparison["Automatic vehicles"])
-    evaluation_accuracy = (
+    evaluation_agreement = (
         max(0.0, 1.0 - abs(automatic_total - manual_total) / manual_total)
         if manual_total
         else 0.0
     )
     st.metric(
-        "Evaluation-set total-count accuracy",
-        f"{evaluation_accuracy:.1%}",
+        "Evaluation-set total-count agreement",
+        f"{evaluation_agreement:.1%}",
         help=(
             "Calculated as 1 − absolute vehicle-count error / manual vehicle "
             "count. This measures total-count agreement, not object-level "
@@ -278,7 +278,7 @@ with st.expander("Method and limitations"):
     )
 
 with st.expander("All video results"):
-    st.dataframe(counts, hide_index=True, use_container_width=True)
+    st.dataframe(counts, hide_index=True, width="stretch")
 
 st.caption(
     "FlowSense · Kellan Reddy · Kelvin Qian · Brayden Chen · Batuhan Akbas"
