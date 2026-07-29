@@ -31,15 +31,18 @@ from flowsense.yolo_detector import YoloDetector
 
 ROOT = Path(__file__).resolve().parent
 RESULTS_DIR = ROOT / "easy_results"
-VIDEOS_DIR = ROOT / "videos"
 ANALYSIS_STATE_KEY = "uploaded_analysis"
 UPLOADER_VERSION_KEY = "upload_widget_version"
 
-VIDEO_FILES = {
-    "Video 1": VIDEOS_DIR / "flowsense_hybrid_video_1.mp4",
-    "Video 2": VIDEOS_DIR / "flowsense_hybrid_video_2.mp4",
-    "Video 3": VIDEOS_DIR / "flowsense_hybrid_video_3.mp4",
-    "Video 4": VIDEOS_DIR / "flowsense_hybrid_video_4.mp4",
+GITHUB_VIDEO_BASE_URL = (
+    "https://media.githubusercontent.com/media/"
+    "KReddy36/FlowSense/main/videos"
+)
+VIDEO_URLS = {
+    f"Video {number}": (
+        f"{GITHUB_VIDEO_BASE_URL}/flowsense_hybrid_video_{number}.mp4"
+    )
+    for number in range(1, 5)
 }
 
 CLASS_COLUMNS = [
@@ -502,23 +505,18 @@ def _render_video_analysis(
     video_column, class_column = st.columns([1.6, 1])
     with video_column:
         st.subheader("Annotated tracking and prediction video")
-        video_path = VIDEO_FILES.get(selected_video)
-        if show_video and video_path and video_path.exists():
-            preview_error = _render_browser_video(video_path)
-            if preview_error:
-                st.warning(
-                    "The annotated video is available to download but its "
-                    f"browser preview could not be prepared. {preview_error}"
-                )
-            else:
-                st.caption(
-                    "Solid paths show observed trajectories. Dashed extensions "
-                    "show short-term predicted positions when available."
-                )
-        elif show_video:
-            st.warning(
-                "The annotated video is not available at the expected path."
+        video_url = VIDEO_URLS.get(selected_video)
+        if show_video and video_url:
+            # Stream the real Git LFS media object in the viewer's browser.
+            # This avoids relying on the deployment checkout to materialize
+            # Git LFS pointers or reading a 100+ MB video into server memory.
+            st.video(video_url, format="video/mp4")
+            st.caption(
+                "Solid paths show observed trajectories. Dashed extensions "
+                "show short-term predicted positions when available."
             )
+        elif show_video:
+            st.warning("The annotated video is not configured.")
         else:
             st.caption("Video display is disabled in the sidebar.")
 
