@@ -43,6 +43,7 @@ class MotionSnapshot:
     predicted_time: float
     predicted_center_x: float
     predicted_center_y: float
+    prediction_scale: float
     observed_points: tuple[MotionPoint, ...]
     predicted_points: tuple[tuple[float, float], ...]
 
@@ -263,6 +264,7 @@ class MotionPredictor:
             predicted_time=timestamp + horizon_seconds,
             predicted_center_x=predicted_x,
             predicted_center_y=predicted_y,
+            prediction_scale=applied_scale,
             observed_points=tuple(state.points),
             predicted_points=predicted_points,
         )

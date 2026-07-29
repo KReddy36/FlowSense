@@ -33,6 +33,7 @@ development-only verification files.
 ### Configuration and documentation
 
 - `requirements.txt`
+- `.streamlit/config.toml` â€” local dashboard upload-size configuration
 - `.gitignore`
 - `README.md`
 - `README_automatic_counter.md`
@@ -90,6 +91,10 @@ computer directories.
 - `videos/flowsense_tracking3.mp4`
 - `videos/flowsense_tracking4*.mp4`
 - `videos/member2_bytetrack_overlay.mp4`
+- `videos/flowsense_hybrid_video_1.mp4`
+- `videos/flowsense_hybrid_video_2.mp4`
+- `videos/flowsense_hybrid_video_3.mp4`
+- `videos/flowsense_hybrid_video_4.mp4`
 - `videos/README.md`
 
 ### Legacy reproduction tools
@@ -117,6 +122,8 @@ runtime-only submission:
 - `tests/test_identity_consolidator.py`
 - `tests/test_motion_prediction.py`
 - `tests/test_learned_motion.py`
+- `tests/test_official_hybrid_generator.py`
+- `tests/test_official_dashboard_artifacts.py`
 - `tests/test_prediction_evaluation.py`
 - `tests/test_video_compat.py`
 - `tests/test_yolo_detector.py`

@@ -79,7 +79,7 @@ class DashboardSmokeTests(unittest.TestCase):
         app.run(timeout=60)
         self.assertTrue(
             any(
-                metric.label == "Prediction accuracy (win rate)"
+                metric.label == "Hybrid beats constant velocity"
                 for metric in app.metric
             )
         )

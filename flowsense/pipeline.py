@@ -63,6 +63,7 @@ MOTION_COLUMNS = (
     "predicted_time_seconds",
     "predicted_center_x",
     "predicted_center_y",
+    "prediction_scale",
 )
 ProgressCallback = Callable[[int, int], None]
 
@@ -455,6 +456,7 @@ def _process_video(
                                 "predicted_center_y": (
                                     snapshot.predicted_center_y
                                 ),
+                                "prediction_scale": snapshot.prediction_scale,
                             }
                         )
 

@@ -23,11 +23,18 @@ class DatasetConfigTests(unittest.TestCase):
             )
             self.assertEqual(
                 config.video_path.name,
-                f"flowsense_tracking{dataset_id}.mp4",
+                f"source_traffic{dataset_id}.mp4",
             )
-            self.assertIn(dataset_id, config.output_path.stem)
+            self.assertEqual(
+                config.output_path.name,
+                f"flowsense_hybrid_video_{dataset_id}.mp4",
+            )
             self.assertIn(dataset_id, config.tracks_output_path.stem)
             self.assertIn(dataset_id, config.motion_output_path.stem)
+        self.assertEqual(
+            DATASETS["1"].output_path.name,
+            "flowsense_hybrid_video_1.mp4",
+        )
 
     def test_no_video_writes_only_canonical_csv(self) -> None:
         config = DATASETS["1"]
