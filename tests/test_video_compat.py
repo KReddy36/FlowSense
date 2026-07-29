@@ -10,6 +10,7 @@ import cv2
 import numpy as np
 
 from flowsense.video_compat import (
+    browser_video_bytes,
     convert_to_browser_mp4,
     is_h264_mp4,
 )
@@ -46,6 +47,29 @@ class BrowserVideoTests(unittest.TestCase):
             finally:
                 capture.release()
             self.assertTrue(success)
+
+    def test_browser_bytes_temporarily_convert_mp4v_input(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source.mp4"
+            writer = cv2.VideoWriter(
+                str(source),
+                cv2.VideoWriter_fourcc(*"mp4v"),
+                10.0,
+                (64, 48),
+            )
+            self.assertTrue(writer.isOpened())
+            try:
+                for _ in range(3):
+                    writer.write(
+                        np.zeros((48, 64, 3), dtype=np.uint8)
+                    )
+            finally:
+                writer.release()
+
+            preview = browser_video_bytes(source)
+
+            self.assertIn(b"ftyp", preview[:64])
+            self.assertTrue(b"avc1" in preview or b"avc3" in preview)
 
 
 if __name__ == "__main__":

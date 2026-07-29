@@ -24,6 +24,7 @@ from flowsense.dashboard_uploads import (
     validate_pipeline_outputs,
 )
 from flowsense.pipeline import PipelineResult
+from flowsense.video_compat import VideoConversionError, browser_video_bytes
 from flowsense.yolo_detector import YoloDetector
 
 
@@ -94,6 +95,17 @@ def load_summary() -> dict:
 def load_yolo_detector() -> YoloDetector:
     """Load YOLO once per Streamlit server process."""
     return YoloDetector()
+
+
+@st.cache_data(show_spinner=False)
+def load_browser_video(
+    path: str,
+    modified_nanoseconds: int,
+    size_bytes: int,
+) -> bytes:
+    """Return cached browser-compatible bytes for one unchanged local video."""
+    _ = (modified_nanoseconds, size_bytes)
+    return browser_video_bytes(path)
 
 
 def require_files() -> None:
@@ -271,11 +283,17 @@ def _render_video_analysis(
         st.subheader("Annotated tracking and prediction video")
         video_path = VIDEO_FILES.get(selected_video)
         if show_video and video_path and video_path.exists():
-            st.video(str(video_path))
-            st.caption(
-                "Solid paths show observed trajectories. Dashed extensions "
-                "show short-term predicted positions when available."
-            )
+            preview_error = _render_browser_video(video_path)
+            if preview_error:
+                st.warning(
+                    "The annotated video is available to download but its "
+                    f"browser preview could not be prepared. {preview_error}"
+                )
+            else:
+                st.caption(
+                    "Solid paths show observed trajectories. Dashed extensions "
+                    "show short-term predicted positions when available."
+                )
         elif show_video:
             st.warning(
                 "The annotated video is not available at the expected path."
@@ -386,13 +404,26 @@ def _render_prediction_evaluation(
             "Median prediction error (px)",
             "Median stationary baseline error (px)",
         ],
-    ].set_index("Dataset")
+    ]
 
     prediction_left, prediction_right = st.columns(2)
     with prediction_left:
         st.subheader("Prediction vs stationary baseline")
-        st.bar_chart(error_chart)
-        st.caption("Lower pixel error is better.")
+        st.bar_chart(
+            error_chart,
+            x="Dataset",
+            y=[
+                "Median prediction error (px)",
+                "Median stationary baseline error (px)",
+            ],
+            x_label="Video",
+            y_label="Median error (pixels)",
+            stack=False,
+        )
+        st.caption(
+            "Prediction and stationary-baseline errors are grouped side by "
+            "side for each video. Lower pixel error is better."
+        )
 
     with prediction_right:
         st.subheader("Prediction win rate by video")
@@ -656,10 +687,20 @@ def _render_uploaded_result(analysis: dict[str, object]) -> None:
         _render_clear_button(analysis)
         return
 
-    if result.video_preview_warning:
-        st.warning(result.video_preview_warning)
-
-    st.video(str(result.output_video), format="video/mp4")
+    preview_error = _render_browser_video(result.output_video)
+    if preview_error:
+        st.warning(
+            result.video_preview_warning
+            or (
+                "The annotated video is available below as a download, but "
+                f"its browser preview could not be prepared. {preview_error}"
+            )
+        )
+    elif result.video_preview_warning:
+        st.info(
+            "FlowSense prepared a temporary browser-compatible preview. The "
+            "download remains the original annotated MP4."
+        )
     metric_frames, metric_ids, metric_prediction = st.columns(3)
     metric_frames.metric("Frames processed", result.processed_frames)
     metric_ids.metric("Unique tracking IDs", result.unique_track_ids)
@@ -754,6 +795,21 @@ def _counts_dataframe(values: dict[str, int], label: str) -> pd.DataFrame:
     return pd.DataFrame(
         [{label: name, "Count": count} for name, count in sorted(values.items())]
     )
+
+
+def _render_browser_video(video_path: Path) -> str | None:
+    """Render a cached H.264 preview and return a readable failure detail."""
+    try:
+        metadata = video_path.stat()
+        video_data = load_browser_video(
+            str(video_path.resolve()),
+            metadata.st_mtime_ns,
+            metadata.st_size,
+        )
+    except (OSError, VideoConversionError) as exc:
+        return str(exc)
+    st.video(video_data, format="video/mp4")
+    return None
 
 
 st.title("🚦 FlowSense")
