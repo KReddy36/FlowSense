@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import csv
+import subprocess
 import unittest
 from pathlib import Path
+
+import cv2
+import imageio_ffmpeg
 
 from flowsense.video_compat import is_h264_mp4
 
@@ -19,33 +23,94 @@ class OfficialDashboardArtifactTests(unittest.TestCase):
         )
         self.assertIn("maxUploadSize = 100", config)
 
-    def test_dashboard_requires_learned_results_and_streams_all_hybrid_videos(
+    def test_dashboard_requires_learned_results_and_uses_local_web_videos(
         self,
     ) -> None:
         source = (ROOT / "Dashboard.py").read_text(encoding="utf-8")
         self.assertIn('"learned_prediction_results.csv"', source)
-        self.assertIn(
-            '"KReddy36/FlowSense/main/videos"',
-            source,
-        )
+        self.assertNotIn("media.githubusercontent.com", source)
+        self.assertNotIn("GITHUB_VIDEO_BASE_URL", source)
+        self.assertIn("VIDEO_FILES", source)
+        self.assertIn('ROOT / "videos"', source)
         self.assertIn('f"Video {number}"', source)
-        self.assertIn("flowsense_hybrid_video_{number}.mp4", source)
+        self.assertIn("flowsense_web_hybrid_video_{number}.mp4", source)
         self.assertIn("for number in range(1, 5)", source)
 
-    def test_official_videos_are_materialized_h264_files(self) -> None:
+    def test_web_videos_are_real_h264_yuv420p_mp4_files(self) -> None:
+        ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
         for video_id in range(1, 5):
-            path = ROOT / "videos" / f"flowsense_hybrid_video_{video_id}.mp4"
-            self.assertTrue(path.is_file(), msg=f"Missing official Video {video_id}")
+            path = (
+                ROOT
+                / "videos"
+                / f"flowsense_web_hybrid_video_{video_id}.mp4"
+            )
+            self.assertTrue(path.is_file(), msg=f"Missing web Video {video_id}")
             with path.open("rb") as handle:
-                header = handle.read(128)
+                header = handle.read(2 * 1024 * 1024)
             self.assertFalse(
                 header.startswith(b"version https://git-lfs"),
-                msg=f"Video {video_id} is an unmaterialized Git LFS pointer",
+                msg=f"Web Video {video_id} is a Git LFS pointer",
             )
+            self.assertIn(b"ftyp", header[:64])
             self.assertTrue(
                 is_h264_mp4(path),
-                msg=f"Video {video_id} is not a browser-compatible H.264 MP4",
+                msg=f"Web Video {video_id} is not H.264",
             )
+            probe = subprocess.run(
+                [ffmpeg, "-hide_banner", "-i", str(path)],
+                check=False,
+                capture_output=True,
+                text=True,
+                shell=False,
+            )
+            self.assertIn("Video: h264", probe.stderr)
+            self.assertIn("yuv420p", probe.stderr)
+            self.assertLess(path.stat().st_size, 100_000_000)
+            self.assertGreaterEqual(header.find(b"moov"), 0)
+            self.assertGreater(header.find(b"mdat"), header.find(b"moov"))
+
+    def test_web_videos_preserve_original_frame_counts_and_rates(self) -> None:
+        for video_id in range(1, 5):
+            original = (
+                ROOT / "videos" / f"flowsense_hybrid_video_{video_id}.mp4"
+            )
+            web = (
+                ROOT
+                / "videos"
+                / f"flowsense_web_hybrid_video_{video_id}.mp4"
+            )
+            original_capture = cv2.VideoCapture(str(original))
+            web_capture = cv2.VideoCapture(str(web))
+            try:
+                self.assertTrue(original_capture.isOpened())
+                self.assertTrue(web_capture.isOpened())
+                self.assertEqual(
+                    int(original_capture.get(cv2.CAP_PROP_FRAME_COUNT)),
+                    int(web_capture.get(cv2.CAP_PROP_FRAME_COUNT)),
+                )
+                self.assertAlmostEqual(
+                    original_capture.get(cv2.CAP_PROP_FPS),
+                    web_capture.get(cv2.CAP_PROP_FPS),
+                    places=3,
+                )
+                self.assertEqual(
+                    int(web_capture.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                    1280,
+                )
+                self.assertEqual(
+                    int(web_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+                    720,
+                )
+            finally:
+                original_capture.release()
+                web_capture.release()
+
+    def test_web_videos_are_excluded_from_lfs_pattern(self) -> None:
+        attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8")
+        self.assertIn(
+            "videos/flowsense_web_hybrid_video_*.mp4 -text",
+            attributes,
+        )
 
     def test_official_vehicle_counts_are_unchanged(self) -> None:
         path = ROOT / "easy_results" / "automatic_counts.csv"
