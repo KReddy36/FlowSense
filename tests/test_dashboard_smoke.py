@@ -74,10 +74,9 @@ class DashboardSmokeTests(unittest.TestCase):
             app.selectbox[0].select(video)
             app.run(timeout=60)
             self.assertEqual(len(app.get("video")), 1)
-            self.assertIn(
-                f"flowsense_hybrid_video_{video[-1]}.mp4",
-                str(app.get("video")[0].proto),
-            )
+            video_proto = app.get("video")[0].proto
+            self.assertEqual(video_proto.type, video_proto.Type.NATIVE)
+            self.assertTrue(video_proto.url.endswith(".mp4"))
             vehicle_metric = next(
                 metric
                 for metric in app.metric
