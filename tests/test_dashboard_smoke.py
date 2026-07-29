@@ -2,13 +2,32 @@
 
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
+import cv2
+import numpy as np
 from streamlit.testing.v1 import AppTest
 
 from flowsense.pipeline import PipelineResult
+
+
+def _write_test_video(path: Path) -> None:
+    writer = cv2.VideoWriter(
+        str(path),
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        10.0,
+        (64, 48),
+    )
+    if not writer.isOpened():
+        raise RuntimeError("Test video writer could not open")
+    try:
+        for _ in range(3):
+            writer.write(np.zeros((48, 64, 3), dtype=np.uint8))
+    finally:
+        writer.release()
 
 
 class DashboardSmokeTests(unittest.TestCase):
@@ -64,6 +83,24 @@ class DashboardSmokeTests(unittest.TestCase):
                 for metric in app.metric
             )
         )
+        chart_specs = [
+            json.loads(chart.proto.spec)
+            for chart in app.get("vega_lite_chart")
+        ]
+        comparison_chart = next(
+            spec
+            for spec in chart_specs
+            if spec["encoding"]["x"].get("title") == "Road-user class"
+        )
+        self.assertFalse(comparison_chart["encoding"]["y"]["stack"])
+        self.assertIn("xOffset", comparison_chart["encoding"])
+        baseline_chart = next(
+            spec
+            for spec in chart_specs
+            if spec["encoding"]["x"].get("title") == "Video"
+        )
+        self.assertFalse(baseline_chart["encoding"]["y"]["stack"])
+        self.assertIn("xOffset", baseline_chart["encoding"])
         self.assertEqual(list(app.exception), [])
 
     def test_uploaded_result_displays_prediction_accuracy(self) -> None:
@@ -73,7 +110,7 @@ class DashboardSmokeTests(unittest.TestCase):
             run_dir = Path(directory)
             video = run_dir / "annotated.mp4"
             report = run_dir / "report.html"
-            video.write_bytes(b"test video")
+            _write_test_video(video)
             report.write_text("<html>test report</html>", encoding="utf-8")
 
             app = AppTest.from_file(str(dashboard)).run(timeout=60)
@@ -101,6 +138,7 @@ class DashboardSmokeTests(unittest.TestCase):
 
             app.run(timeout=60)
 
+            self.assertEqual(len(app.get("video")), 1)
             prediction_metrics = [
                 metric
                 for metric in app.metric

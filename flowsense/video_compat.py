@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import tempfile
 from pathlib import Path
 
 
@@ -101,3 +102,17 @@ def is_h264_mp4(path: str | Path) -> bool:
     return b"ftyp" in header[:64] and (
         b"avc1" in header or b"avc3" in header
     )
+
+
+def browser_video_bytes(path: str | Path) -> bytes:
+    """Read an H.264 MP4, converting a temporary preview when necessary."""
+    video_path = Path(path)
+    if not video_path.is_file() or video_path.stat().st_size == 0:
+        raise VideoConversionError("The preview video is missing.")
+    if is_h264_mp4(video_path):
+        return video_path.read_bytes()
+
+    with tempfile.TemporaryDirectory(prefix="flowsense-preview-") as directory:
+        preview_path = Path(directory) / "browser_preview.mp4"
+        convert_to_browser_mp4(video_path, preview_path)
+        return preview_path.read_bytes()
