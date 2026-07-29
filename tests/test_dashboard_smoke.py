@@ -53,6 +53,15 @@ class DashboardSmokeTests(unittest.TestCase):
                 "Prediction & Evaluation",
             ],
         )
+        overview_metrics = {metric.label: metric.value for metric in app.metric}
+        self.assertEqual(
+            overview_metrics["Hybrid beats constant velocity"],
+            "66.287%",
+        )
+        self.assertEqual(
+            overview_metrics["Learned-hybrid median error"],
+            "9.149 px",
+        )
         app.radio[0].set_value("Video Analysis")
         app.run(timeout=60)
         expected_totals = {
