@@ -7,6 +7,7 @@ Run locally:
 from __future__ import annotations
 
 import json
+from html import escape
 from pathlib import Path
 
 import pandas as pd
@@ -217,6 +218,7 @@ def _render_hybrid_prediction_evaluation(
         learned_prediction["Test set"] == "All videos"
     ].iloc[0]
 
+    _render_labeled_divider(f"Selected video · {selected_video}")
     st.subheader(f"{selected_video} learned-hybrid position prediction")
     columns = st.columns(5)
     columns[0].metric("Eligible forecasts", f"{int(selected_learned['Samples']):,}")
@@ -242,6 +244,7 @@ def _render_hybrid_prediction_evaluation(
         "Lower pixel error is better."
     )
 
+    _render_labeled_divider("All videos · Cross-video prediction comparison")
     errors = learned_prediction.loc[
         learned_prediction["Test set"] != "All videos",
         [
@@ -336,7 +339,7 @@ def _render_hybrid_prediction_evaluation(
     st.subheader("Learned-prediction evaluation table")
     st.dataframe(learned_prediction, hide_index=True, width="stretch")
 
-    st.divider()
+    _render_labeled_divider(f"Selected video · {selected_video} count evaluation")
     st.subheader("Manual traffic count vs FlowSense")
     selected_classes = class_comparison.loc[
         class_comparison["Video"] == selected_video,
@@ -381,6 +384,33 @@ def _render_hybrid_prediction_evaluation(
                 "vehicle count; this is not object-level detection accuracy."
             ),
         )
+
+
+def _render_labeled_divider(label: str) -> None:
+    """Render a clear scope boundary without changing dashboard data."""
+    safe_label = escape(label)
+    st.markdown(
+        f"""
+        <div style="
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            margin: 1.6rem 0 1rem 0;
+        ">
+            <div style="height: 1px; flex: 1; background: #9ca3af;"></div>
+            <div style="
+                color: #4b5563;
+                font-size: 0.9rem;
+                font-weight: 700;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                white-space: nowrap;
+            ">{safe_label}</div>
+            <div style="height: 1px; flex: 1; background: #9ca3af;"></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def _render_network_overview(
